@@ -1,0 +1,50 @@
+# CustomDic
+
+一个只有「快捷查词窗口」的 Windows 词典：按快捷键弹出，输入即查。功能对标欧路词典的迷你查词窗，但不做主程序、生词本这些东西，保持简单。
+
+- **本地 MDX/MDD 词典**：自己导入（牛津、朗文等），样式、图片、发音与原词典一致；朗文这类 Speex（.spx）发音会自动转码播放
+- **AI 翻译兜底**：只在所有词典都查不到（或输入整句）时调用 DeepSeek，流式输出，结果缓存，不重复花钱
+- **例句 / 近反义词 / 维基百科**：Tatoeba 中英例句（离线）、WordNet + Datamuse、维基百科摘要。除 AI 翻译外不使用任何 AI
+- **结果顺序可调**：每本词典、例句、近反义词、百科、AI 翻译都能拖动排序、停用、默认折叠
+- **多显示器友好**：按显示器 EDID 而不是 Windows 编号识别屏幕，每次弹出重新计算位置和 DPI，睡眠唤醒、息屏后自动校正
+- 亮色 / 暗色 / 跟随系统主题；联想输入；词形还原（went → go，looked up → look up）
+
+## 安装
+
+到 [Releases](../../releases) 下载 `CustomDic-Setup-x.y.z.exe`，安装时不需要管理员权限。
+
+首次使用：
+
+1. 右键托盘图标 →「设置」→「导入词典…」，选择 `.mdx` 文件（同名 `.mdd` 会自动带上）。本项目**不附带任何词典**。
+2. 「AI 翻译」页填入 [DeepSeek API Key](https://platform.deepseek.com/)，点「获取模型列表」选择模型。Key 保存在 Windows 凭据管理器中。
+3. 例句库（约 26 MB）和 WordNet（约 11 MB）会在首次启动时自动下载。
+
+## 快捷键
+
+默认唤出键是 `Ctrl+F12`，可在设置里修改。Win+空格 被 Windows 占用，无法直接注册；想用它可以借助 [AutoHotkey v2](https://www.autohotkey.com/)：
+
+```ahk
+#Space::SendInput "^{F12}"
+```
+
+也可以从命令行或脚本直接查词：`CustomDic.exe serendipity`（程序已在运行时会复用同一个窗口）。
+
+## 数据位置
+
+配置、索引、缓存、日志都在 `%LOCALAPPDATA%\CustomDic`。托盘菜单 →「打开日志文件夹」。
+
+## 从源码运行 / 打包
+
+需要 Python 3.12（**不要用 Anaconda 的 Python**：它自带的旧版 VC 运行库会让 PySide6 加载失败）。
+
+```powershell
+scripts\setup_dev.ps1      # 在 %USERPROFILE%\.customdic 下建独立的 Python 和虚拟环境
+run.bat                    # 运行
+%USERPROFILE%\.customdic\venv\Scripts\pyinstaller packaging\customdic.spec --noconfirm   # 打包到 dist\CustomDic
+```
+
+安装包由 [Inno Setup 6](https://jrsoftware.org/isinfo.php) 生成（`packaging/installer.iss`）。推送 `v*` 标签后，GitHub Actions 会自动打包并发布 Release。
+
+## 许可
+
+代码采用 MIT 许可证，见 [LICENSE](LICENSE)。用到的数据和第三方组件见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

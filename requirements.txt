@@ -1,0 +1,5 @@
+PySide6==6.12.0
+keyring==25.7.0
+nltk==3.10.4
+opencc-python-reimplemented==0.1.7
+lemminflect==0.2.3
