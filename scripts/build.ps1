@@ -3,7 +3,7 @@
 # Usage: scripts\build.ps1            build + restart
 #        scripts\build.ps1 -NoLaunch  build only
 param([switch]$NoLaunch)
-$ErrorActionPreference = "Stop"
+# No "Stop" preference: Windows PowerShell treats PyInstaller's stderr warnings as errors. Exit codes are checked instead.
 $root = "$env:USERPROFILE\.customdic"
 $repo = Split-Path $PSScriptRoot -Parent
 $exe = "$root\build\dist\CustomDic\CustomDic.exe"
