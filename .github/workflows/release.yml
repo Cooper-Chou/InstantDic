@@ -27,7 +27,7 @@ jobs:
           pip install -r requirements.txt pyinstaller
 
       - name: Build app folder
-        run: pyinstaller packaging/customdic.spec --noconfirm
+        run: pyinstaller packaging/instantdic.spec --noconfirm
 
       - name: Version
         id: ver
@@ -45,24 +45,24 @@ jobs:
             choco install innosetup -y --no-progress
             $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           }
-          & $iscc packaging/installer.iss "/DMyAppVersion=${{ steps.ver.outputs.version }}" "/DDistDir=..\dist\CustomDic"
+          & $iscc packaging/installer.iss "/DMyAppVersion=${{ steps.ver.outputs.version }}" "/DDistDir=..\dist\InstantDic"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build portable zip
         shell: pwsh
-        run: Compress-Archive -Path dist/CustomDic -DestinationPath "dist/CustomDic-Portable-${{ steps.ver.outputs.version }}.zip"
+        run: Compress-Archive -Path dist/InstantDic -DestinationPath "dist/InstantDic-Portable-${{ steps.ver.outputs.version }}.zip"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: CustomDic-${{ steps.ver.outputs.version }}
+          name: InstantDic-${{ steps.ver.outputs.version }}
           path: |
-            dist/CustomDic-Setup-*.exe
-            dist/CustomDic-Portable-*.zip
+            dist/InstantDic-Setup-*.exe
+            dist/InstantDic-Portable-*.zip
 
       - name: Publish release
         if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/CustomDic-Setup-*.exe
-            dist/CustomDic-Portable-*.zip
+            dist/InstantDic-Setup-*.exe
+            dist/InstantDic-Portable-*.zip

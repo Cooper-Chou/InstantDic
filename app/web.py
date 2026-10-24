@@ -16,6 +16,7 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineUrlRequestJob, QWebEngineUrlScheme, \
     QWebEngineUrlSchemeHandler
 
+from . import ai_providers
 from .audio import SpeexTranscoder
 from .theme import THEMES
 
@@ -277,11 +278,11 @@ class SchemeHandler(QWebEngineUrlSchemeHandler):
 
     def _ai_section(self, src, q):
         collapsed = " collapsed" if src.get("collapsed") else ""
-        model = html.escape(self.ai.model())
+        model = html.escape(" · ".join(x for x in (ai_providers.label(self.ai.provider()), self.ai.model()) if x))
         head = (f"<div class='sec-head'><span class='arrow'>▾</span>{html.escape(src.get('name') or 'AI 翻译')}"
                 f"<span class='ai-tag'>AI 生成，仅供参考{(' · ' + model) if model else ''}</span></div>")
         if not self.ai.configured():
-            body = ("<div class='ai-body'><span class='muted'>尚未设置 DeepSeek API Key。<br>"
+            body = ("<div class='ai-body'><span class='muted'>尚未设置 AI 翻译的 API Key。<br>"
                     "右键托盘图标 → <b>设置</b> → <b>AI 翻译</b> 填写后即可使用。</span></div>")
             return f"<div class='sec{collapsed}'>{head}{body}</div>"
         init = ""

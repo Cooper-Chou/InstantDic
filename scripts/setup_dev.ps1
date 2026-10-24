@@ -1,6 +1,6 @@
-# Creates the dev environment outside OneDrive: %USERPROFILE%\.customdic\venv
+# Creates the dev environment outside OneDrive: %USERPROFILE%\.instantdic\venv
 # Uses a standalone CPython via uv, because Anaconda's bundled MSVC runtime breaks PySide6.
-$root = "$env:USERPROFILE\.customdic"
+$root = "$env:USERPROFILE\.instantdic"
 python -m pip install -q --target "$root\uvtool" uv
 $env:UV_PYTHON_INSTALL_DIR = "$root\python"
 $env:UV_CACHE_DIR = "$root\uvcache"

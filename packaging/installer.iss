@@ -1,27 +1,29 @@
 ﻿; Inno Setup script. Build the PyInstaller folder first, then:
-;   ISCC packaging\installer.iss /DMyAppVersion=0.1.0 /DDistDir=dist\CustomDic
-; Per-user install (no admin rights): %LOCALAPPDATA%\Programs\CustomDic
+;   ISCC packaging\installer.iss /DMyAppVersion=0.1.0 /DDistDir=dist\InstantDic
+; The wizard asks: install for me only (no admin, %LOCALAPPDATA%\Programs\InstantDic)
+; or for all users (admin, C:\Program Files\InstantDic).
 
 #ifndef MyAppVersion
   #define MyAppVersion "0.1.0"
 #endif
 #ifndef DistDir
-  #define DistDir "..\dist\CustomDic"
+  #define DistDir "..\dist\InstantDic"
 #endif
 
 [Setup]
 AppId={{6E1B8C52-3F4A-4C0E-9A57-2D3B1C9E7F10}
-AppName=CustomDic
+AppName=InstantDic
 AppVersion={#MyAppVersion}
-AppPublisher=CustomDic
-DefaultDirName={localappdata}\Programs\CustomDic
-DefaultGroupName=CustomDic
+AppPublisher=InstantDic
+DefaultDirName={autopf}\InstantDic
+DefaultGroupName=InstantDic
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
-OutputBaseFilename=CustomDic-Setup-{#MyAppVersion}
+PrivilegesRequiredOverridesAllowed=dialog
+OutputBaseFilename=InstantDic-Setup-{#MyAppVersion}
 OutputDir=..\dist
 SetupIconFile=..\assets\icon.ico
-UninstallDisplayIcon={app}\CustomDic.exe
+UninstallDisplayIcon={app}\InstantDic.exe
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
@@ -41,17 +43,17 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; Flags: unchecked
 Source: "{#DistDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\CustomDic"; Filename: "{app}\CustomDic.exe"
-Name: "{group}\{cm:UninstallProgram,CustomDic}"; Filename: "{uninstallexe}"
-Name: "{userdesktop}\CustomDic"; Filename: "{app}\CustomDic.exe"; Tasks: desktopicon
+Name: "{group}\InstantDic"; Filename: "{app}\InstantDic.exe"
+Name: "{group}\{cm:UninstallProgram,InstantDic}"; Filename: "{uninstallexe}"
+Name: "{userdesktop}\InstantDic"; Filename: "{app}\InstantDic.exe"; Tasks: desktopicon
 
 [Registry]
 ; Same value the in-app "开机自动启动" checkbox uses, so the two stay in sync.
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "CustomDic"; \
-  ValueData: """{app}\CustomDic.exe"""; Flags: uninsdeletevalue; Tasks: autostart
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "InstantDic"; \
+  ValueData: """{app}\InstantDic.exe"""; Flags: uninsdeletevalue; Tasks: autostart
 
 [Run]
-Filename: "{app}\CustomDic.exe"; Description: "{cm:LaunchProgram,CustomDic}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\InstantDic.exe"; Description: "{cm:LaunchProgram,InstantDic}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
-Filename: "{sys}\taskkill.exe"; Parameters: "/IM CustomDic.exe /F"; Flags: runhidden; RunOnceId: "KillApp"
+Filename: "{sys}\taskkill.exe"; Parameters: "/IM InstantDic.exe /F"; Flags: runhidden; RunOnceId: "KillApp"

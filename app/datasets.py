@@ -25,7 +25,7 @@ WORDNET_ZIP = NLTK_DIR / "corpora" / "wordnet.zip"
 
 TATOEBA = "https://downloads.tatoeba.org/exports/per_language"
 WORDNET_URL = "https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/wordnet.zip"
-USER_AGENT = "CustomDic/0.1 (desktop dictionary)"
+USER_AGENT = "InstantDic/0.1 (desktop dictionary)"
 
 DATASETS = {
     "examples": {"label": "Tatoeba 中英例句", "size": "约 26 MB"},

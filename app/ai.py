@@ -1,4 +1,4 @@
-"""DeepSeek translation fallback (OpenAI-compatible streaming chat API).
+"""AI translation fallback over any OpenAI-compatible streaming chat API (DeepSeek, Qwen, OpenAI, …).
 
 The only AI call in the app. It runs only when no dictionary has the word, or when the
 user clicks the AI button. Results are cached so a repeat lookup costs no tokens.
@@ -13,13 +13,13 @@ import keyring
 from PySide6.QtCore import QObject, QTimer, QUrl, Signal
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 
+from . import ai_providers
 from .config import DATA_DIR
 
 log = logging.getLogger(__name__)
 
-KEYRING_SERVICE = "CustomDic"
-KEYRING_USER = "deepseek-api-key"
-DEFAULT_BASE_URL = "https://api.deepseek.com"
+KEYRING_SERVICE = "InstantDic"
+KEYRING_USER = "ai-api-key"
 TIMEOUT_MS = 30000
 
 WORD_PROMPT = """你是一部简明的英汉双向词典。用户给出一个单词或短语，请按下面格式用 Markdown 输出，不要多余的开场白：
@@ -97,8 +97,11 @@ class AiService(QObject):
     def ai_cfg(self):
         return self.cfg.data["ai"]
 
+    def provider(self):
+        return self.ai_cfg.get("provider") or "deepseek"
+
     def base_url(self):
-        return (self.ai_cfg.get("base_url") or DEFAULT_BASE_URL).rstrip("/")
+        return (self.ai_cfg.get("base_url") or ai_providers.base_url(self.provider())).rstrip("/")
 
     def model(self):
         return self.ai_cfg.get("model") or ""
@@ -117,10 +120,10 @@ class AiService(QObject):
         rid = self._next_id
         key = get_api_key()
         if not key:
-            QTimer.singleShot(0, lambda: self.update.emit(rid, "", "error", "尚未设置 DeepSeek API Key"))
+            QTimer.singleShot(0, lambda: self.update.emit(rid, "", "error", "尚未设置 AI 翻译的 API Key"))
             return rid
         if not self.model():
-            # First use: pick the Flash model from the account's model list, then start.
+            # First use: pick the provider's cheap/fast model from the account's model list, then start.
             self.list_models(lambda models, err: self._after_autopick(rid, q, models, err))
             return rid
         self._start(rid, q, key)
@@ -130,7 +133,10 @@ class AiService(QObject):
         if err or not models:
             self.update.emit(rid, "", "error", err or "无法获取模型列表，请在设置中手动填写模型名")
             return
-        pick = next((m for m in models if "flash" in m.lower()), models[0])
+        pick = ai_providers.pick_model(self.provider(), models)
+        if not pick:
+            self.update.emit(rid, "", "error", "没有找到可用的对话模型，请在设置中手动填写模型名")
+            return
         log.info("auto-selected model %s from %s", pick, models)
         self.ai_cfg["model"] = pick
         self.cfg.save()
@@ -236,7 +242,7 @@ class AiService(QObject):
             detail = json.loads(body.decode("utf-8", "ignore") or "{}").get("error", {}).get("message", "")
         except (ValueError, AttributeError):
             pass
-        known = {401: "API Key 无效，请在设置中检查", 402: "DeepSeek 账户余额不足", 429: "请求太频繁，请稍后再试",
+        known = {401: "API Key 无效，请在设置中检查（也可能是选错了服务商）", 402: "账户余额不足", 403: "没有权限使用该模型或接口", 429: "请求太频繁，请稍后再试",
                  400: "请求格式错误（模型名可能不对）", 404: "接口地址或模型名不存在"}
         if status in known:
             return known[status] + (f"（{detail}）" if detail else "")

@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QFileDia
                                QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem,
                                QMessageBox, QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget)
 
-from . import autostart
+from . import ai_providers, autostart
 from .dictionaries import INDEX_DIR, source_id_for
 from .screens import ANCHOR_LABELS, ANCHORS, friendly_name, screen_ids
 from .theme import THEME_LABELS
@@ -29,7 +29,7 @@ class ConsoleWindow(QWidget):
     def __init__(self, ctl):
         super().__init__(None, Qt.Window)
         self.ctl = ctl
-        self.setWindowTitle("CustomDic 设置")
+        self.setWindowTitle("InstantDic 设置")
         self.resize(560, 480)
         tabs = QTabWidget()
         tabs.addTab(self._build_sources_tab(), "词典与排序")
@@ -176,7 +176,7 @@ class ConsoleWindow(QWidget):
 
     # ---------- AI ----------
     def _build_ai_tab(self):
-        from .ai import DEFAULT_BASE_URL, get_api_key
+        from .ai import get_api_key
         w = QWidget()
         f = QFormLayout(w)
         ai = self.ctl.cfg.data["ai"]
@@ -185,7 +185,8 @@ class ConsoleWindow(QWidget):
         key_row = QHBoxLayout()
         self.ai_key = QLineEdit(get_api_key())
         self.ai_key.setEchoMode(QLineEdit.Password)
-        self.ai_key.setPlaceholderText("sk-...")
+        self.ai_key.setPlaceholderText("粘贴任意厂商的 API Key，会自动识别服务商")
+        self.ai_key.textEdited.connect(self._on_key_edited)
         show = QPushButton("显示")
         show.setCheckable(True)
         show.toggled.connect(lambda v: self.ai_key.setEchoMode(QLineEdit.Normal if v else QLineEdit.Password))
@@ -194,13 +195,24 @@ class ConsoleWindow(QWidget):
         f.addRow("API Key", key_row)
         f.addRow("", QLabel("Key 保存在 Windows 凭据管理器中，不会写进配置文件。"))
 
-        self.ai_base = QLineEdit(ai.get("base_url") or DEFAULT_BASE_URL)
+        self.ai_provider = QComboBox()
+        for pid in ai_providers.PROVIDERS:
+            self.ai_provider.addItem(ai_providers.label(pid), pid)
+        self.ai_provider.setCurrentIndex(max(0, self.ai_provider.findData(ai.get("provider", "deepseek"))))
+        self.ai_provider.currentIndexChanged.connect(self._on_provider_changed)
+        f.addRow("服务商", self.ai_provider)
+        self.ai_hint = QLabel("")
+        self.ai_hint.setWordWrap(True)
+        f.addRow("", self.ai_hint)
+
+        self.ai_base = QLineEdit(ai.get("base_url") or ai_providers.base_url(ai.get("provider", "deepseek")))
+        self.ai_base.setPlaceholderText("https://.../v1（OpenAI 兼容接口地址）")
         f.addRow("接口地址", self.ai_base)
 
         model_row = QHBoxLayout()
         self.ai_model = QComboBox()
         self.ai_model.setEditable(True)
-        self.ai_model.lineEdit().setPlaceholderText("留空 = 自动选择名字带 flash 的模型")
+        self.ai_model.lineEdit().setPlaceholderText("留空 = 首次使用时自动选择该厂商便宜、快速的模型")
         if ai.get("model"):
             self.ai_model.addItem(ai["model"])
         self.ai_model.setCurrentText(ai.get("model", ""))
@@ -229,11 +241,32 @@ class ConsoleWindow(QWidget):
         f.addRow("", self.ai_status)
         return w
 
+    def _on_key_edited(self, text):
+        cands = ai_providers.detect(text)
+        if not cands:
+            self.ai_hint.setText("无法从 Key 识别服务商，请手动选择；不在列表里的选「自定义」并填写接口地址。" if text.strip() else "")
+            return
+        self.ai_provider.setCurrentIndex(self.ai_provider.findData(cands[0]))
+        if len(cands) == 1:
+            self.ai_hint.setText(f"已识别为：{ai_providers.label(cands[0])}")
+        else:
+            names = "、".join(ai_providers.label(c) for c in cands)
+            self.ai_hint.setText(f"这种格式的 Key 可能属于：{names}。已先选「{ai_providers.label(cands[0])}」，不对请手动改。")
+
+    def _on_provider_changed(self):
+        pid = self.ai_provider.currentData()
+        if pid != "custom":
+            self.ai_base.setText(ai_providers.base_url(pid))
+        self.ai_model.clear()  # model names differ per vendor; re-picked on first use or via the list
+        self.ai_model.setCurrentText("")
+
     def _save_ai(self):
         from .ai import set_api_key
         ai = self.ctl.cfg.data["ai"]
-        ai.update(base_url=self.ai_base.text().strip(), model=self.ai_model.currentText().strip(),
-                  show_button=self.ai_btn.isChecked())
+        pid = self.ai_provider.currentData()
+        base = self.ai_base.text().strip()
+        ai.update(provider=pid, base_url="" if base == ai_providers.base_url(pid) else base,
+                  model=self.ai_model.currentText().strip(), show_button=self.ai_btn.isChecked())
         self.ctl.cfg.save()
         try:
             set_api_key(self.ai_key.text().strip())
@@ -249,15 +282,15 @@ class ConsoleWindow(QWidget):
 
         def done(models, err):
             if err:
-                self.ai_status.setText(f"获取失败：{err}")
+                self.ai_status.setText(f"获取失败：{err}\n可以直接在「模型」里手动填写模型名。")
                 return
             cur = self.ai_model.currentText()
             self.ai_model.clear()
             self.ai_model.addItems(models)
-            pick = cur if cur in models else next((m for m in models if "flash" in m.lower()), models[0] if models else "")
+            pick = cur if cur in models else (ai_providers.pick_model(self.ai_provider.currentData(), models) or "")
             self.ai_model.setCurrentText(pick)
             self._save_ai()
-            self.ai_status.setText(f"可用模型：{'、'.join(models)}\n已选择：{pick}")
+            self.ai_status.setText(f"共 {len(models)} 个模型，已选择：{pick}（可在下拉框里改）")
 
         self.ctl.ai.list_models(done)
 

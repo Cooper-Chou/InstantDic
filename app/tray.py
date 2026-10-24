@@ -6,23 +6,9 @@ from PySide6.QtGui import QAction, QActionGroup, QColor, QFont, QIcon, QPainter,
 from PySide6.QtWidgets import QLabel, QMenu, QSystemTrayIcon
 
 from .config import LOG_DIR
+from .icon import make_icon
 from .theme import THEME_LABELS
 from .screens import friendly_name, screen_ids
-
-
-def make_icon():
-    pm = QPixmap(64, 64)
-    pm.fill(Qt.transparent)
-    p = QPainter(pm)
-    p.setRenderHint(QPainter.Antialiasing)
-    p.setBrush(QColor("#2563eb"))
-    p.setPen(Qt.NoPen)
-    p.drawRoundedRect(2, 2, 60, 60, 14, 14)
-    p.setPen(QColor("white"))
-    p.setFont(QFont("Microsoft YaHei UI", 30, QFont.Bold))
-    p.drawText(QRect(0, 0, 64, 64), Qt.AlignCenter, "词")
-    p.end()
-    return QIcon(pm)
 
 
 class _ScreenLabel(QLabel):
@@ -45,7 +31,7 @@ class Tray(QSystemTrayIcon):
     def __init__(self, app_ctl):
         super().__init__(make_icon())
         self.ctl = app_ctl
-        self.setToolTip("CustomDic 快捷查词")
+        self.setToolTip("InstantDic 快捷查词")
         self.menu = QMenu()
         self.menu.aboutToShow.connect(self._rebuild)
         self.setContextMenu(self.menu)

@@ -40,7 +40,7 @@ class PopupWindow(QWidget):
         self._ai_rid = None
         self._ai_state = None
         self._sec_state = None  # {"q": query, "items": {source id: html}}
-        self.setWindowTitle("CustomDic")
+        self.setWindowTitle("InstantDic")
         # Opaque window: translucent top-levels and Chromium don't mix well. The EDGE-wide
         # margin around the card is the resize handle; Win11 DWM adds the rounded border.
         self.setObjectName("popup")

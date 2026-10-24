@@ -12,7 +12,7 @@ from PySide6.QtWebEngineCore import QWebEngineProfile
 from PySide6.QtWebEngineWidgets import QWebEngineView  # noqa: F401  (must load before QApplication)
 from PySide6.QtWidgets import QApplication, QSystemTrayIcon
 
-from . import autostart, theme
+from . import autostart, migrate, theme
 from .ai import AiService
 from .datasets import DATASETS, DatasetManager
 from .providers import SectionService
@@ -27,14 +27,14 @@ from .tray import Tray
 from .web import SCHEME, SchemeHandler, register_scheme
 from .winevents import SystemEvents
 
-log = logging.getLogger("customdic")
-# One instance per data folder (a test run with CUSTOMDIC_DATA_DIR doesn't collide with the real one).
-INSTANCE_KEY = "CustomDic-" + hashlib.sha1(str(DATA_DIR).lower().encode("utf-8")).hexdigest()[:10]
+log = logging.getLogger("instantdic")
+# One instance per data folder (a test run with INSTANTDIC_DATA_DIR doesn't collide with the real one).
+INSTANCE_KEY = "InstantDic-" + hashlib.sha1(str(DATA_DIR).lower().encode("utf-8")).hexdigest()[:10]
 
 
 def setup_logging():
     LOG_DIR.mkdir(parents=True, exist_ok=True)
-    handler = logging.handlers.RotatingFileHandler(LOG_DIR / "customdic.log", maxBytes=1_000_000,
+    handler = logging.handlers.RotatingFileHandler(LOG_DIR / "instantdic.log", maxBytes=1_000_000,
                                                    backupCount=3, encoding="utf-8")
     handlers = [handler] + ([logging.StreamHandler()] if sys.stderr else [])  # pythonw has no stderr
     logging.basicConfig(level=logging.INFO, handlers=handlers,
@@ -76,7 +76,7 @@ class AppController:
         err = self.sys.register_hotkey(self.cfg.data["hotkey"])
         if err:
             log.warning(err)
-            self.tray.showMessage("CustomDic", err, QSystemTrayIcon.Warning, 8000)
+            self.tray.showMessage("InstantDic", err, QSystemTrayIcon.Warning, 8000)
 
         # Download free offline datasets for enabled built-in sections in the background.
         for name in ("examples", "wordnet"):
@@ -119,7 +119,7 @@ class AppController:
                 err = str(e)
         if err:
             src["error"] = err
-            self.tray.showMessage("CustomDic", f"导入「{src.get('name')}」失败：{err}", QSystemTrayIcon.Warning, 8000)
+            self.tray.showMessage("InstantDic", f"导入「{src.get('name')}」失败：{err}", QSystemTrayIcon.Warning, 8000)
         else:
             src.pop("error", None)
             if not src.get("named_by_user"):
@@ -130,7 +130,7 @@ class AppController:
     def _on_dataset_finished(self, name, err):
         label = DATASETS[name]["label"]
         if err:
-            self.tray.showMessage("CustomDic", f"{label} 下载失败：{err}\n下次启动会重试。", QSystemTrayIcon.Warning, 8000)
+            self.tray.showMessage("InstantDic", f"{label} 下载失败：{err}\n下次启动会重试。", QSystemTrayIcon.Warning, 8000)
         else:
             if name == "wordnet":
                 self.sections.providers["thesaurus"].warm_up()
@@ -196,11 +196,11 @@ class AppController:
 def main():
     register_scheme()
     app = QApplication(sys.argv)
-    app.setApplicationName("CustomDic")
+    app.setApplicationName("InstantDic")
     app.setQuitOnLastWindowClosed(False)
 
     # Single instance: a second launch asks the running one to show the popup,
-    # or to look up a word: `CustomDic.exe serendipity` (handy from AutoHotkey scripts).
+    # or to look up a word: `InstantDic.exe serendipity` (handy from AutoHotkey scripts).
     query = " ".join(sys.argv[1:]).strip()
     sock = QLocalSocket()
     sock.connectToServer(INSTANCE_KEY)
@@ -209,8 +209,11 @@ def main():
         sock.waitForBytesWritten(300)
         return 0
 
+    notes = migrate.run()  # before anything opens files in the data folder
     setup_logging()
-    log.info("starting CustomDic")
+    log.info("starting InstantDic")
+    for note in notes:
+        log.info("migration: %s", note)
     QLocalServer.removeServer(INSTANCE_KEY)
     server = QLocalServer()
     server.listen(INSTANCE_KEY)

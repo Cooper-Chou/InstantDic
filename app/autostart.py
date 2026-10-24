@@ -4,7 +4,7 @@ import sys
 import winreg
 
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
-VALUE = "CustomDic"
+VALUE = "InstantDic"
 
 
 def command():
@@ -12,7 +12,7 @@ def command():
         return f'"{sys.executable}"'
     # dev checkout: pythonw + the launcher script next to the app package
     exe = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
-    script = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "customdic.pyw")
+    script = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "instantdic.pyw")
     return f'"{exe}" "{script}"'
 
 

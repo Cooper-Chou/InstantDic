@@ -1,11 +1,11 @@
-# PyInstaller spec: build with  pyinstaller packaging/customdic.spec --noconfirm
-# Produces dist/CustomDic/CustomDic.exe (one-folder build: starts much faster than one-file with Qt WebEngine).
+# PyInstaller spec: build with  pyinstaller packaging/instantdic.spec --noconfirm
+# Produces dist/InstantDic/InstantDic.exe (one-folder build: starts much faster than one-file with Qt WebEngine).
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 ROOT = SPECPATH + "/.."
 
 a = Analysis(
-    [ROOT + "/customdic.pyw"],
+    [ROOT + "/instantdic.pyw"],
     pathex=[ROOT],
     datas=collect_data_files("lemminflect") + collect_data_files("opencc") + [(ROOT + "/assets/icon.png", "assets")],
     hiddenimports=collect_submodules("keyring.backends") + ["nltk.corpus.reader.wordnet"],
@@ -13,6 +13,6 @@ a = Analysis(
               "PySide6.QtQuick3D", "PySide6.QtDesigner", "PySide6.QtBluetooth", "PySide6.QtSql"],
 )
 pyz = PYZ(a.pure)
-exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="CustomDic", console=False,
+exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="InstantDic", console=False,
           icon=ROOT + "/assets/icon.ico", version=None)
-coll = COLLECT(exe, a.binaries, a.datas, name="CustomDic")
+coll = COLLECT(exe, a.binaries, a.datas, name="InstantDic")

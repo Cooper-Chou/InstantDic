@@ -8,7 +8,7 @@
 | [Princeton WordNet 3.0](https://wordnet.princeton.edu/) (via the NLTK data package) | Synonyms, antonyms, sense glosses | WordNet 3.0 license (permissive, attribution required) |
 | [Datamuse API](https://www.datamuse.com/api/) | Additional synonyms / antonyms | Free API, no key. Usage is subject to Datamuse's terms. |
 | [Wikipedia](https://www.wikipedia.org/) REST API | Encyclopedia summaries | Text CC BY-SA 4.0. Each summary links to its article. |
-| [DeepSeek API](https://platform.deepseek.com/) | AI translation fallback (user's own key) | DeepSeek terms of service |
+| AI providers (DeepSeek, Qwen, Kimi, GLM, Doubao, ERNIE, SiliconFlow, OpenAI, Anthropic, Gemini, xAI, Mistral, Groq, OpenRouter, or any OpenAI-compatible API) | AI translation fallback with the user's own key | Each provider's terms of service |
 
 Dictionaries (.mdx/.mdd) are **not** distributed with this project. Users import their own.
 

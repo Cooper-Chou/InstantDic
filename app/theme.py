@@ -1,7 +1,7 @@
 """Light / dark themes. Every color is set explicitly (Fusion style + full palette), so Windows'
 own dark-mode text colors can never leak in and produce white-on-white text."""
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QFont, QGuiApplication, QPalette
+from PySide6.QtCore import QPointF, QRectF, Qt
+from PySide6.QtGui import QColor, QFont, QGuiApplication, QImage, QPainter, QPalette, QPen
 
 THEMES = {
     "light": {
@@ -45,7 +45,7 @@ def palette(c):
     return p
 
 
-def stylesheet(c):
+def stylesheet(c, check=""):
     return f"""
 QWidget {{ color: {c['text']}; }}
 #popup {{ background: {c['panel']}; }}
@@ -63,7 +63,7 @@ QListView {{ background: {c['input_bg']}; color: {c['text']}; border: 1px solid 
 QListView::item:selected {{ background: {c['selection']}; color: {c['text']}; }}
 QCheckBox::indicator, QListView::indicator {{ width: 13px; height: 13px; border: 1px solid {c['dark']};
             border-radius: 3px; background: {c['input_bg']}; }}
-QCheckBox::indicator:checked, QListView::indicator:checked {{ background: {c['accent']}; border-color: {c['accent']}; }}
+QCheckBox::indicator:checked, QListView::indicator:checked {{ image: url({check}); border: none; background: transparent; }}
 QCheckBox::indicator:hover, QListView::indicator:hover {{ border-color: {c['accent']}; }}
 QMenu {{ background: {c['panel']}; color: {c['text']}; border: 1px solid {c['border']}; }}
 QMenu::item:selected {{ background: {c['hover']}; }}
@@ -77,5 +77,31 @@ def apply(app, setting):
     app.setStyle("Fusion")
     app.setFont(QFont("Microsoft YaHei UI", 9))
     app.setPalette(palette(c))
-    app.setStyleSheet(stylesheet(c))
+    app.setStyleSheet(stylesheet(c, _check_image()))
     return name
+
+
+CHECK_GREEN = "#16a34a"
+
+
+def _check_image():
+    """Green box with a white tick, drawn once into the data folder (stylesheets need a file path)."""
+    from .config import DATA_DIR
+    path = DATA_DIR / "ui" / "check-v1.png"
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        size = 64
+        img = QImage(size, size, QImage.Format_ARGB32_Premultiplied)
+        img.fill(Qt.transparent)
+        p = QPainter(img)
+        p.setRenderHint(QPainter.Antialiasing)
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(CHECK_GREEN))
+        p.drawRoundedRect(QRectF(0, 0, size, size), 14, 14)
+        pen = QPen(QColor("white"), size * 0.13, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+        p.setPen(pen)
+        p.setBrush(Qt.NoBrush)
+        p.drawPolyline([QPointF(size * 0.24, size * 0.52), QPointF(size * 0.43, size * 0.70), QPointF(size * 0.77, size * 0.32)])
+        p.end()
+        img.save(str(path))
+    return path.as_posix()
