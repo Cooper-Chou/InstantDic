@@ -11,7 +11,12 @@
 
 ## 安装
 
-到 [Releases](../../releases) 下载 `CustomDic-Setup-x.y.z.exe`，安装时不需要管理员权限。
+到 [Releases](../../releases) 下载，二选一：
+
+- `CustomDic-Setup-x.y.z.exe`：安装版，不需要管理员权限，带开始菜单快捷方式和开机自启选项。
+- `CustomDic-Portable-x.y.z.zip`：免安装版，解压后运行 `CustomDic\CustomDic.exe`。`CustomDic.exe` 必须和旁边的 `_internal` 文件夹放在一起。
+
+两个版本的配置和数据都保存在同一个位置，可以互换。
 
 首次使用：
 
@@ -38,12 +43,11 @@
 需要 Python 3.12（**不要用 Anaconda 的 Python**：它自带的旧版 VC 运行库会让 PySide6 加载失败）。
 
 ```powershell
-scripts\setup_dev.ps1      # 在 %USERPROFILE%\.customdic 下建独立的 Python 和虚拟环境
-run.bat                    # 运行
-%USERPROFILE%\.customdic\venv\Scripts\pyinstaller packaging\customdic.spec --noconfirm   # 打包到 dist\CustomDic
+scripts\setup_dev.ps1      # 一次性：在 %USERPROFILE%\.customdic 下建独立的 Python 和虚拟环境
+scripts\build.ps1          # 打包到 %USERPROFILE%\.customdic\build\dist\CustomDic，并重启程序
 ```
 
-安装包由 [Inno Setup 6](https://jrsoftware.org/isinfo.php) 生成（`packaging/installer.iss`）。推送 `v*` 标签后，GitHub Actions 会自动打包并发布 Release。
+安装包由 [Inno Setup 6](https://jrsoftware.org/isinfo.php) 生成（`packaging/installer.iss`）。每次推送到 main，GitHub Actions 都会生成安装版和免安装版（在 Actions 页面下载）；推送 `v*` 标签则会自动发布 Release。
 
 ## 许可
 

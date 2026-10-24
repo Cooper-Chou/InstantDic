@@ -12,7 +12,7 @@ from PySide6.QtWebEngineCore import QWebEngineProfile
 from PySide6.QtWebEngineWidgets import QWebEngineView  # noqa: F401  (must load before QApplication)
 from PySide6.QtWidgets import QApplication, QSystemTrayIcon
 
-from . import theme
+from . import autostart, theme
 from .ai import AiService
 from .datasets import DATASETS, DatasetManager
 from .providers import SectionService
@@ -83,6 +83,13 @@ class AppController:
             sid = "thesaurus" if name == "wordnet" else name
             if any(s["id"] == sid and s.get("enabled", True) for s in self.cfg.data["sources"]):
                 self.datasets.ensure(name)
+
+        # Keep the autostart entry pointing at whatever build is running now (installer, zip, local build).
+        try:
+            if autostart.is_enabled():
+                autostart.set_enabled(True)
+        except OSError:
+            log.exception("could not refresh autostart entry")
 
         for src in self.engine.stale_sources():
             log.info("index missing or outdated, rebuilding: %s", src["path"])
