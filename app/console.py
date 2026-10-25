@@ -184,7 +184,7 @@ class ConsoleWindow(QWidget):
         w = QWidget()
         f = QFormLayout(w)
         ai = self.ctl.cfg.data["ai"]
-        f.addRow(QLabel(tr("只在本地词典查不到时调用（或手动点结果页底部的「用 AI 翻译」）。")))
+        f.addRow(QLabel(tr("只在本地词典查不到时调用（或手动点结果页顶部的「仍然用 AI 翻译」）。")))
 
         key_row = QHBoxLayout()
         self.ai_key = QLineEdit(get_api_key())
@@ -226,7 +226,7 @@ class ConsoleWindow(QWidget):
         model_row.addWidget(fetch)
         f.addRow(tr("模型"), model_row)
 
-        self.ai_btn = QCheckBox(tr("词典查到时，在结果页底部显示「用 AI 翻译」按钮（点了才调用）"))
+        self.ai_btn = QCheckBox(tr("词典查到时，在结果页顶部显示「仍然用 AI 翻译」按钮（点了才调用）"))
         self.ai_btn.setChecked(ai.get("show_button", True))
         f.addRow("", self.ai_btn)
 

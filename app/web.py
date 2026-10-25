@@ -105,7 +105,7 @@ iframe {{ display:block; width:100%; border:0; height:60px; background:var(--bg)
 .ai-body .err {{ color:#e5484d; margin-top:6px; }}
 .cursor {{ animation:blink 1s steps(1) infinite; color:var(--accent); }}
 @keyframes blink {{ 50% {{ opacity:0; }} }}
-.ai-btn {{ display:inline-block; margin:10px 12px 14px; padding:4px 10px; border:1px solid var(--border);
+.ai-btn {{ display:block; margin:6px 12px; padding:5px 10px; text-align:center; border:1px solid var(--border);
   border-radius:6px; color:var(--muted); text-decoration:none; font-size:12px; }}
 .ai-btn:hover {{ color:var(--text); background:var(--hover); }}
 .sec-body {{ padding:8px 16px 12px; line-height:1.6; }}
@@ -253,7 +253,10 @@ class SchemeHandler(QWebEngineUrlSchemeHandler):
             parts.append("<div class='note'>" + tr("本地词典中没有找到 {q}", q=html.escape(q)) + "</div>")
         elif word.casefold() != q.casefold():
             parts.append("<div class='note'>" + tr("未找到 {q}，显示 <b>{word}</b> 的结果", q=html.escape(q), word=html.escape(word)) + "</div>")
-        # Clicking "用 AI 翻译" puts the AI section first so it's visible without scrolling.
+        # The "仍然用 AI 翻译" button sits above every dictionary, so a disappointing dictionary
+        # result can be retried without scrolling; after clicking, the AI section comes first.
+        if sections and ai_on and not want_ai and self.cfg.data["ai"].get("show_button", True):
+            parts.append(f"<a class='ai-btn' href='{result_url(q, True).toString()}'>✨ {tr('仍然用 AI 翻译')}</a>")
         if want_ai and sections:
             parts.append(self._ai_section(ai_src, q))
         for i, src in enumerate(self.cfg.data["sources"]):
@@ -265,8 +268,6 @@ class SchemeHandler(QWebEngineUrlSchemeHandler):
                 parts.append(self._async_section(src, lookup_word, pending))
         if pending:
             self.sectionsNeeded.emit(q, lookup_word, pending)
-        if sections and ai_on and not want_ai and self.cfg.data["ai"].get("show_button", True):
-            parts.append(f"<a class='ai-btn' href='{result_url(q, True).toString()}'>{tr("用 AI 翻译")}</a>")
         return self._page("".join(parts))
 
     def _dict_section(self, src, word, fid):

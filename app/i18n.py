@@ -104,8 +104,8 @@ EN = {
     "内置项目不能移除，取消勾选即可停用。": "Built-in sections can't be removed; uncheck them to disable.",
     "移除词典": "Remove dictionary",
     "从列表中移除「{name}」？\n（不会删除词典文件本身）": "Remove \"{name}\" from the list?\n(The dictionary files themselves are not deleted.)",
-    "只在本地词典查不到时调用（或手动点结果页底部的「用 AI 翻译」）。":
-        "Used only when no local dictionary has the word (or when you click \"Translate with AI\" at the bottom of results).",
+    "只在本地词典查不到时调用（或手动点结果页顶部的「仍然用 AI 翻译」）。":
+        "Used only when no local dictionary has the word (or when you click \"Translate with AI anyway\" at the top of results).",
     "粘贴任意厂商的 API Key，会自动识别服务商": "Paste an API key from any provider; it is detected automatically",
     "显示": "Show",
     "Key 保存在 Windows 凭据管理器中，不会写进配置文件。": "The key is stored in Windows Credential Manager, never in the config file.",
@@ -115,8 +115,8 @@ EN = {
     "留空 = 首次使用时自动选择该厂商便宜、快速的模型": "Empty = pick this provider's cheap, fast model on first use",
     "获取模型列表": "Get model list",
     "模型": "Model",
-    "词典查到时，在结果页底部显示「用 AI 翻译」按钮（点了才调用）":
-        "When dictionaries find the word, show a \"Translate with AI\" button at the bottom (only calls AI when clicked)",
+    "词典查到时，在结果页顶部显示「仍然用 AI 翻译」按钮（点了才调用）":
+        "When dictionaries find the word, show a \"Translate with AI anyway\" button at the top (only calls AI when clicked)",
     "保存": "Save",
     "保存并测试": "Save and test",
     "无法从 Key 识别服务商，请手动选择；不在列表里的选「自定义」并填写接口地址。":
@@ -166,7 +166,7 @@ EN = {
     "本地词典中没有找到 <b>{q}</b>。<br>（AI 翻译已在设置中停用。）": "<b>{q}</b> was not found in local dictionaries.<br>(AI translation is disabled in Settings.)",
     "本地词典中没有找到 {q}": "{q} was not found in local dictionaries",
     "未找到 {q}，显示 <b>{word}</b> 的结果": "{q} not found; showing results for <b>{word}</b>",
-    "用 AI 翻译": "Translate with AI",
+    "仍然用 AI 翻译": "Translate with AI anyway",
     "AI 生成，仅供参考": "AI-generated, for reference only",
     "尚未设置 AI 翻译的 API Key。<br>右键托盘图标 → <b>设置</b> → <b>AI 翻译</b> 填写后即可使用。":
         "No API key set for AI translation.<br>Right-click the tray icon → <b>Settings</b> → <b>AI translation</b> to add one.",
