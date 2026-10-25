@@ -74,12 +74,13 @@ class PopupWindow(QWidget):
         grip.setCursor(Qt.SizeAllCursor)
         grip.setToolTip(tr("拖动窗口"))
         self.back = QToolButton(text="←", toolTip=tr("后退 (Alt+←)"))
+        self.forward = QToolButton(text="→", toolTip=tr("前进 (Alt+→)"))
         self.input = QLineEdit(placeholderText=tr("输入单词或句子，回车查询"))
         self.input.returnPressed.connect(self._on_submit)
         self.input.textEdited.connect(self._on_text_edited)
         self.input.installEventFilter(self)
         self.pin = QToolButton(text="📌", checkable=True, toolTip=tr("固定窗口（失焦不隐藏）"))
-        for wdg, stretch in ((grip, 0), (self.back, 0), (self.input, 1), (self.pin, 0)):
+        for wdg, stretch in ((grip, 0), (self.back, 0), (self.forward, 0), (self.input, 1), (self.pin, 0)):
             hl.addWidget(wdg, stretch)
         lay.addWidget(header)
 
@@ -115,7 +116,10 @@ class PopupWindow(QWidget):
         self.view.loadFinished.connect(lambda _ok: (self._push_ai(), self._push_sections()))
         ai.update.connect(self._on_ai_update)
         sections.ready.connect(self._on_section_ready)
-        self.back.clicked.connect(self.view.back)
+        self.back.clicked.connect(lambda: self._navigate(-1))
+        self.forward.clicked.connect(lambda: self._navigate(1))
+        self.back.setEnabled(False)
+        self.forward.setEnabled(False)
         self.stack.addWidget(list_page)
         self.stack.addWidget(self.view)
         self.stack.setCurrentWidget(self.view)
@@ -125,8 +129,8 @@ class PopupWindow(QWidget):
         self.view.load(QUrl("mdict://app/home"))
 
         QShortcut(QKeySequence(Qt.Key_Escape), self, activated=self.hide_popup)
-        QShortcut(QKeySequence("Alt+Left"), self, activated=self.view.back)
-        QShortcut(QKeySequence("Alt+Right"), self, activated=self.view.forward)
+        QShortcut(QKeySequence("Alt+Left"), self, activated=lambda: self._navigate(-1))
+        QShortcut(QKeySequence("Alt+Right"), self, activated=lambda: self._navigate(1))
         QShortcut(QKeySequence("Ctrl+L"), self, activated=lambda: (self.input.setFocus(), self.input.selectAll()))
 
         self._resize_save = QTimer(self, singleShot=True, interval=400)
@@ -368,6 +372,12 @@ class PopupWindow(QWidget):
                 self.input.setText(q)
                 self.input.selectAll()
         self.back.setEnabled(self.view.history().canGoBack())
+        self.forward.setEnabled(self.view.history().canGoForward())
+
+    def _navigate(self, step):
+        """Back/forward through looked-up words (also mouse side buttons over the results)."""
+        self.stack.setCurrentWidget(self.view)  # leave the suggestion list if it was showing
+        (self.view.back if step < 0 else self.view.forward)()
 
     def reload_results(self):
         self.view.reload()

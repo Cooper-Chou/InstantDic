@@ -23,4 +23,6 @@ try {
 } finally { Pop-Location }
 
 Write-Host "Built $exe"
-if (-not $NoLaunch) { Start-Process $exe }
+# Launch through Explorer so the app runs as if double-clicked: a process started from another
+# app's sandbox (e.g. a packaged app's terminal) would inherit its file-system virtualization.
+if (-not $NoLaunch) { Start-Process explorer.exe -ArgumentList "`"$exe`"" }

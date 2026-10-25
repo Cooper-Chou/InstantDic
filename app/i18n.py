@@ -67,6 +67,7 @@ EN = {
     # --- popup
     "拖动窗口": "Drag window",
     "后退 (Alt+←)": "Back (Alt+←)",
+    "前进 (Alt+→)": "Forward (Alt+→)",
     "输入单词或句子，回车查询": "Type a word or sentence, press Enter",
     "固定窗口（失焦不隐藏）": "Pin window (don't hide when focus is lost)",
     "搜索记录": "Recent searches",
