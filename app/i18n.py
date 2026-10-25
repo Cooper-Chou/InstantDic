@@ -1,20 +1,26 @@
 """UI language: Chinese source strings, English translations.
 
 tr("中文 {x}", x=...) returns the English text when the UI language is English, otherwise the
-Chinese original. Untranslated strings fall back to Chinese. Language is chosen at startup
-("system" follows the Windows display language) and changes apply after a restart, except
-the result pages and tray menu, which pick up the new language immediately.
+Chinese original. Untranslated strings fall back to Chinese. Only Chinese and English exist; on
+first run the default is Chinese on a Chinese Windows and English everywhere else, then it's
+the user's explicit choice. Changes apply after a restart, except the result pages and tray
+menu, which pick up the new language immediately.
 """
 from PySide6.QtCore import QLocale
 
-LANG_LABELS = {"system": "跟随系统", "zh": "中文", "en": "English"}
+LANG_LABELS = {"zh": "中文", "en": "English"}
 _lang = "zh"
 
 
+def first_run_default():
+    # Use the Windows *display* language, not the regional format: plenty of Chinese users run a
+    # Chinese UI with en-US number/date formats (QLocale.system().language() would say English).
+    ui = QLocale.system().uiLanguages()
+    return "zh" if ui and ui[0].lower().startswith("zh") else "en"
+
+
 def resolve(setting):
-    if setting in ("zh", "en"):
-        return setting
-    return "zh" if QLocale.system().language() == QLocale.Chinese else "en"
+    return setting if setting in LANG_LABELS else first_run_default()
 
 
 def set_language(setting):

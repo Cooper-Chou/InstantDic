@@ -16,7 +16,7 @@ CONFIG_PATH = DATA_DIR / "config.json"
 DEFAULTS = {
     "hotkey": "Ctrl+F12",
     "theme": "system",         # "system" / "light" / "dark"
-    "language": "system",      # "system" / "zh" / "en"
+    "language": "",            # "zh" / "en"; empty = choose on first run from the Windows language
     # Result sections in display order: dictionaries ({"id","type":"mdx","name","path","enabled","collapsed"})
     # and built-in sources (BUILTIN_SOURCES), all reorderable in the Console.
     "sources": [],

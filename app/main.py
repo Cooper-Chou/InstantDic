@@ -17,7 +17,7 @@ from .ai import AiService
 from .datasets import DATASETS, DatasetManager
 from .providers import SectionService
 from .config import DATA_DIR, LOG_DIR, Config, section_name
-from .i18n import set_language, tr
+from .i18n import LANG_LABELS, first_run_default, set_language, tr
 from .console import ConsoleWindow, default_name
 from .dictionaries import INDEX_DIR, install_index
 from .indexer import IndexService
@@ -46,7 +46,10 @@ class AppController:
     def __init__(self, app):
         self.app = app
         self.cfg = Config()
-        set_language(self.cfg.data.get("language", "system"))
+        if self.cfg.data.get("language") not in LANG_LABELS:  # first run, or the old "system" value
+            self.cfg.data["language"] = first_run_default()
+            self.cfg.save()
+        set_language(self.cfg.data["language"])
         self.theme_name = theme.apply(app, self.cfg.data.get("theme", "system"))
         QGuiApplication.styleHints().colorSchemeChanged.connect(self._on_system_scheme)
 

@@ -331,7 +331,7 @@ class ConsoleWindow(QWidget):
         self.language = QComboBox()
         for key, label in LANG_LABELS.items():
             self.language.addItem(tr(label), key)
-        self.language.setCurrentIndex(max(0, self.language.findData(self.ctl.cfg.data.get("language", "system"))))
+        self.language.setCurrentIndex(max(0, self.language.findData(self.ctl.cfg.data.get("language", "zh"))))
         self.language.currentIndexChanged.connect(lambda: self.ctl.set_language(self.language.currentData()))
         lang_row = QHBoxLayout()
         lang_row.addWidget(self.language, 1)

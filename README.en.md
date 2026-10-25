@@ -15,7 +15,7 @@ A Windows dictionary that is nothing but a quick-lookup popup: press a hotkey, t
 - **Examples / synonyms & antonyms / Wikipedia**: Tatoeba English–Chinese example sentences (offline), WordNet + Datamuse, Wikipedia summaries. No AI is used anywhere except the translation fallback.
 - **Your order**: every dictionary, examples, synonyms, Wikipedia and AI translation can be reordered by drag-and-drop, disabled, or collapsed by default.
 - **Multi-monitor friendly**: screens are identified by their EDID, not by Windows' display numbers. Position and DPI are recomputed on every popup and corrected after sleep or screen-off.
-- Chinese / English interface (follows Windows by default); light / dark / follow-system theme; type-ahead suggestions; lemmatization (went → go, looked up → look up)
+- Chinese / English interface (picked from the Windows display language on first run, switchable in Settings); light / dark / follow-system theme; type-ahead suggestions; lemmatization (went → go, looked up → look up)
 
 ## Install
 
@@ -32,7 +32,7 @@ First run:
 2. On the AI translation (AI 翻译) tab, paste an API key from any supported provider; the provider is detected automatically. Leave the model empty to have one picked for you, or click "Get model list" (获取模型列表) to choose. The key is stored in Windows Credential Manager.
 3. The example-sentence database (about 26 MB) and WordNet (about 11 MB) download automatically on first start.
 
-The interface follows your Windows display language (Chinese or English). You can switch it under Settings → General → Language.
+The interface is available in Chinese and English. On first run it is Chinese if your Windows display language is Chinese and English otherwise; switch it any time under Settings → General → Language.
 
 ## Hotkey
 
