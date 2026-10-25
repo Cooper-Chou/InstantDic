@@ -92,7 +92,7 @@ html,body {{ margin:0; background:var(--bg); color:var(--text);
 .sec-head:hover {{ color:var(--text); }}
 .sec-head .arrow {{ transition:transform .15s; display:inline-block; }}
 .sec.collapsed .arrow {{ transform:rotate(-90deg); }}
-.sec.collapsed iframe {{ display:none; }}
+.sec.collapsed > :not(.sec-head) {{ display:none; }}
 iframe {{ display:block; width:100%; border:0; height:60px; background:var(--bg); }}
 .msg {{ padding:24px 16px; color:var(--muted); line-height:1.7; }}
 .msg b {{ color:var(--text); }}
