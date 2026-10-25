@@ -11,7 +11,9 @@ from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QFileDia
 
 from . import ai_providers, autostart
 from .anchor_picker import AnchorPicker
+from .config import section_name
 from .dictionaries import INDEX_DIR, source_id_for
+from .i18n import LANG_LABELS, tr
 from .screens import ANCHOR_LABELS, ANCHORS, friendly_name, screen_ids
 from .theme import THEME_LABELS
 
@@ -31,12 +33,12 @@ class ConsoleWindow(QWidget):
     def __init__(self, ctl):
         super().__init__(None, Qt.Window)
         self.ctl = ctl
-        self.setWindowTitle("InstantDic 设置")
+        self.setWindowTitle(tr("InstantDic 设置"))
         self.resize(560, 480)
         tabs = QTabWidget()
-        tabs.addTab(self._build_sources_tab(), "词典与排序")
-        tabs.addTab(self._build_ai_tab(), "AI 翻译")
-        tabs.addTab(self._build_general_tab(), "常规")
+        tabs.addTab(self._build_sources_tab(), tr("词典与排序"))
+        tabs.addTab(self._build_ai_tab(), tr("AI 翻译"))
+        tabs.addTab(self._build_general_tab(), tr("常规"))
         lay = QVBoxLayout(self)
         lay.addWidget(tabs)
         ctl.indexer.progress.connect(self._on_progress)
@@ -49,7 +51,7 @@ class ConsoleWindow(QWidget):
     def _build_sources_tab(self):
         w = QWidget()
         v = QVBoxLayout(w)
-        v.addWidget(QLabel("勾选=启用；拖动调整查词结果中的先后顺序。"))
+        v.addWidget(QLabel(tr("勾选=启用；拖动调整查词结果中的先后顺序。")))
         self.list = QListWidget()
         self.list.setDragDropMode(QAbstractItemView.InternalMove)
         self.list.setDefaultDropAction(Qt.MoveAction)
@@ -59,7 +61,7 @@ class ConsoleWindow(QWidget):
         row = QHBoxLayout()
         for text, fn in [("导入词典…", self.import_dicts), ("重命名", self.rename), ("默认折叠/展开", self.toggle_collapsed),
                          ("重建索引", self.rebuild), ("移除", self.remove)]:
-            b = QPushButton(text)
+            b = QPushButton(tr(text))
             b.clicked.connect(fn)
             row.addWidget(b)
         row.addStretch(1)
@@ -71,15 +73,15 @@ class ConsoleWindow(QWidget):
         cur = self.list.currentRow()
         self.list.clear()
         for src in self.ctl.cfg.data["sources"]:
-            label = src.get("name") or src["id"]
+            label = section_name(src)
             if src["id"] in self.ctl.indexer.running:
-                label += "（正在建立索引…）"
+                label += tr("（正在建立索引…）")
             elif any(DATASET_SOURCE[n] == src["id"] for n in self.ctl.datasets.running):
-                label += "（正在下载数据…）"
+                label += tr("（正在下载数据…）")
             elif src.get("error"):
-                label += f"（错误：{src['error']}）"
+                label += tr("（错误：{err}）", err=src["error"])
             elif src.get("collapsed"):
-                label += "（默认折叠）"
+                label += tr("（默认折叠）")
             it = QListWidgetItem(label)
             it.setData(ROLE_ID, src["id"])
             it.setFlags(it.flags() | Qt.ItemIsUserCheckable | Qt.ItemIsDragEnabled)
@@ -94,7 +96,7 @@ class ConsoleWindow(QWidget):
             it = self.list.item(i)
             if it.data(ROLE_ID) == sid:
                 self.list.blockSignals(True)
-                it.setText(f"{self._src(sid).get('name')}（{msg}…）")
+                it.setText(section_name(self._src(sid)) + tr("（{msg}…）", msg=msg))
                 self.list.blockSignals(False)
 
     def _src(self, sid):
@@ -117,7 +119,7 @@ class ConsoleWindow(QWidget):
             self.ctl.cfg.save()
 
     def import_dicts(self):
-        paths, _ = QFileDialog.getOpenFileNames(self, "选择要导入的 MDX 词典", "", "MDict 词典 (*.mdx)")
+        paths, _ = QFileDialog.getOpenFileNames(self, tr("选择要导入的 MDX 词典"), "", tr("MDict 词典 (*.mdx)"))
         existing = {s["id"] for s in self.ctl.cfg.data["sources"]}
         for p in paths:
             p = os.path.abspath(p)
@@ -138,7 +140,7 @@ class ConsoleWindow(QWidget):
         src = self._selected()
         if not src:
             return
-        name, ok = QInputDialog.getText(self, "重命名", "显示名称：", QLineEdit.Normal, src.get("name", ""))
+        name, ok = QInputDialog.getText(self, tr("重命名"), tr("显示名称："), QLineEdit.Normal, section_name(src))
         if ok and name.strip():
             src.update(name=name.strip(), named_by_user=True)
             self.ctl.cfg.save()
@@ -162,9 +164,9 @@ class ConsoleWindow(QWidget):
         if not src:
             return
         if src.get("type") != "mdx":
-            QMessageBox.information(self, "移除", "内置项目不能移除，取消勾选即可停用。")
+            QMessageBox.information(self, tr("移除"), tr("内置项目不能移除，取消勾选即可停用。"))
             return
-        if QMessageBox.question(self, "移除词典", f"从列表中移除「{src.get('name')}」？\n（不会删除词典文件本身）") \
+        if QMessageBox.question(self, tr("移除词典"), tr("从列表中移除「{name}」？\n（不会删除词典文件本身）", name=section_name(src))) \
                 != QMessageBox.Yes:
             return
         self.ctl.cfg.data["sources"].remove(src)
@@ -182,56 +184,56 @@ class ConsoleWindow(QWidget):
         w = QWidget()
         f = QFormLayout(w)
         ai = self.ctl.cfg.data["ai"]
-        f.addRow(QLabel("只在本地词典查不到时调用（或手动点结果页底部的「用 AI 翻译」）。"))
+        f.addRow(QLabel(tr("只在本地词典查不到时调用（或手动点结果页底部的「用 AI 翻译」）。")))
 
         key_row = QHBoxLayout()
         self.ai_key = QLineEdit(get_api_key())
         self.ai_key.setEchoMode(QLineEdit.Password)
-        self.ai_key.setPlaceholderText("粘贴任意厂商的 API Key，会自动识别服务商")
+        self.ai_key.setPlaceholderText(tr("粘贴任意厂商的 API Key，会自动识别服务商"))
         self.ai_key.textEdited.connect(self._on_key_edited)
-        show = QPushButton("显示")
+        show = QPushButton(tr("显示"))
         show.setCheckable(True)
         show.toggled.connect(lambda v: self.ai_key.setEchoMode(QLineEdit.Normal if v else QLineEdit.Password))
         key_row.addWidget(self.ai_key, 1)
         key_row.addWidget(show)
         f.addRow("API Key", key_row)
-        f.addRow("", QLabel("Key 保存在 Windows 凭据管理器中，不会写进配置文件。"))
+        f.addRow("", QLabel(tr("Key 保存在 Windows 凭据管理器中，不会写进配置文件。")))
 
         self.ai_provider = QComboBox()
         for pid in ai_providers.PROVIDERS:
             self.ai_provider.addItem(ai_providers.label(pid), pid)
         self.ai_provider.setCurrentIndex(max(0, self.ai_provider.findData(ai.get("provider", "deepseek"))))
         self.ai_provider.currentIndexChanged.connect(self._on_provider_changed)
-        f.addRow("服务商", self.ai_provider)
+        f.addRow(tr("服务商"), self.ai_provider)
         self.ai_hint = QLabel("")
         self.ai_hint.setWordWrap(True)
         f.addRow("", self.ai_hint)
 
         self.ai_base = QLineEdit(ai.get("base_url") or ai_providers.base_url(ai.get("provider", "deepseek")))
-        self.ai_base.setPlaceholderText("https://.../v1（OpenAI 兼容接口地址）")
-        f.addRow("接口地址", self.ai_base)
+        self.ai_base.setPlaceholderText(tr("https://.../v1（OpenAI 兼容接口地址）"))
+        f.addRow(tr("接口地址"), self.ai_base)
 
         model_row = QHBoxLayout()
         self.ai_model = QComboBox()
         self.ai_model.setEditable(True)
-        self.ai_model.lineEdit().setPlaceholderText("留空 = 首次使用时自动选择该厂商便宜、快速的模型")
+        self.ai_model.lineEdit().setPlaceholderText(tr("留空 = 首次使用时自动选择该厂商便宜、快速的模型"))
         if ai.get("model"):
             self.ai_model.addItem(ai["model"])
         self.ai_model.setCurrentText(ai.get("model", ""))
-        fetch = QPushButton("获取模型列表")
+        fetch = QPushButton(tr("获取模型列表"))
         fetch.clicked.connect(self._fetch_models)
         model_row.addWidget(self.ai_model, 1)
         model_row.addWidget(fetch)
-        f.addRow("模型", model_row)
+        f.addRow(tr("模型"), model_row)
 
-        self.ai_btn = QCheckBox("词典查到时，在结果页底部显示「用 AI 翻译」按钮（点了才调用）")
+        self.ai_btn = QCheckBox(tr("词典查到时，在结果页底部显示「用 AI 翻译」按钮（点了才调用）"))
         self.ai_btn.setChecked(ai.get("show_button", True))
         f.addRow("", self.ai_btn)
 
         row = QHBoxLayout()
-        save = QPushButton("保存")
+        save = QPushButton(tr("保存"))
         save.clicked.connect(self._save_ai)
-        test = QPushButton("保存并测试")
+        test = QPushButton(tr("保存并测试"))
         test.clicked.connect(self._test_ai)
         row.addWidget(save)
         row.addWidget(test)
@@ -246,14 +248,15 @@ class ConsoleWindow(QWidget):
     def _on_key_edited(self, text):
         cands = ai_providers.detect(text)
         if not cands:
-            self.ai_hint.setText("无法从 Key 识别服务商，请手动选择；不在列表里的选「自定义」并填写接口地址。" if text.strip() else "")
+            self.ai_hint.setText(tr("无法从 Key 识别服务商，请手动选择；不在列表里的选「自定义」并填写接口地址。") if text.strip() else "")
             return
         self.ai_provider.setCurrentIndex(self.ai_provider.findData(cands[0]))
         if len(cands) == 1:
-            self.ai_hint.setText(f"已识别为：{ai_providers.label(cands[0])}")
+            self.ai_hint.setText(tr("已识别为：{name}", name=ai_providers.label(cands[0])))
         else:
-            names = "、".join(ai_providers.label(c) for c in cands)
-            self.ai_hint.setText(f"这种格式的 Key 可能属于：{names}。已先选「{ai_providers.label(cands[0])}」，不对请手动改。")
+            names = tr("、").join(ai_providers.label(c) for c in cands)
+            self.ai_hint.setText(tr("这种格式的 Key 可能属于：{names}。已先选「{first}」，不对请手动改。",
+                                    names=names, first=ai_providers.label(cands[0])))
 
     def _on_provider_changed(self):
         pid = self.ai_provider.currentData()
@@ -273,18 +276,18 @@ class ConsoleWindow(QWidget):
         try:
             set_api_key(self.ai_key.text().strip())
         except Exception as e:
-            QMessageBox.warning(self, "保存 API Key", f"写入 Windows 凭据管理器失败：{e}")
+            QMessageBox.warning(self, tr("保存 API Key"), tr("写入 Windows 凭据管理器失败：{e}", e=e))
             return False
-        self.ai_status.setText("已保存。")
+        self.ai_status.setText(tr("已保存。"))
         return True
 
     def _fetch_models(self):
         self._save_ai()
-        self.ai_status.setText("正在获取模型列表…")
+        self.ai_status.setText(tr("正在获取模型列表…"))
 
         def done(models, err):
             if err:
-                self.ai_status.setText(f"获取失败：{err}\n可以直接在「模型」里手动填写模型名。")
+                self.ai_status.setText(tr("获取失败：{err}\n可以直接在「模型」里手动填写模型名。", err=err))
                 return
             cur = self.ai_model.currentText()
             self.ai_model.clear()
@@ -292,23 +295,23 @@ class ConsoleWindow(QWidget):
             pick = cur if cur in models else (ai_providers.pick_model(self.ai_provider.currentData(), models) or "")
             self.ai_model.setCurrentText(pick)
             self._save_ai()
-            self.ai_status.setText(f"共 {len(models)} 个模型，已选择：{pick}（可在下拉框里改）")
+            self.ai_status.setText(tr("共 {n} 个模型，已选择：{pick}（可在下拉框里改）", n=len(models), pick=pick))
 
         self.ctl.ai.list_models(done)
 
     def _test_ai(self):
         if not self._save_ai():
             return
-        self.ai_status.setText("正在测试…")
+        self.ai_status.setText(tr("正在测试…"))
         rid = self.ctl.ai.translate("serendipity")
 
         def on_update(r, text, state, err):
             if r != rid:
                 return
             if state == "error":
-                self.ai_status.setText(f"测试失败：{err}")
+                self.ai_status.setText(tr("测试失败：{err}", err=err))
             elif state == "done":
-                self.ai_status.setText(f"测试成功（模型 {self.ctl.ai.model()}）：\n{text[:200]}")
+                self.ai_status.setText(tr("测试成功（模型 {model}）：\n{text}", model=self.ctl.ai.model(), text=text[:200]))
             if state in ("error", "done"):
                 self.ctl.ai.update.disconnect(on_update)
 
@@ -320,34 +323,44 @@ class ConsoleWindow(QWidget):
         f = QFormLayout(w)
         self.theme = QComboBox()
         for key, label in THEME_LABELS.items():
-            self.theme.addItem(label, key)
+            self.theme.addItem(tr(label), key)
         self.theme.setCurrentIndex(max(0, self.theme.findData(self.ctl.cfg.data.get("theme", "system"))))
         self.theme.currentIndexChanged.connect(lambda: self.ctl.set_theme(self.theme.currentData()))
-        f.addRow("主题", self.theme)
+        f.addRow(tr("主题"), self.theme)
+
+        self.language = QComboBox()
+        for key, label in LANG_LABELS.items():
+            self.language.addItem(tr(label), key)
+        self.language.setCurrentIndex(max(0, self.language.findData(self.ctl.cfg.data.get("language", "system"))))
+        self.language.currentIndexChanged.connect(lambda: self.ctl.set_language(self.language.currentData()))
+        lang_row = QHBoxLayout()
+        lang_row.addWidget(self.language, 1)
+        lang_row.addWidget(QLabel(tr("（重启后完全生效）")))
+        f.addRow(tr("界面语言"), lang_row)
 
         hk = QHBoxLayout()
         self.hotkey = QLineEdit(self.ctl.cfg.data["hotkey"])
-        self.hotkey.setPlaceholderText("例如 Ctrl+F12、Ctrl+Alt+D")
-        apply_btn = QPushButton("应用")
+        self.hotkey.setPlaceholderText(tr("例如 Ctrl+F12、Ctrl+Alt+D"))
+        apply_btn = QPushButton(tr("应用"))
         apply_btn.clicked.connect(self._apply_hotkey)
         hk.addWidget(self.hotkey, 1)
         hk.addWidget(apply_btn)
-        f.addRow("唤出快捷键", hk)
-        f.addRow("", QLabel("提示：Win+空格 被系统占用，可用 AutoHotkey 把它映射到这里的快捷键。"))
+        f.addRow(tr("唤出快捷键"), hk)
+        f.addRow("", QLabel(tr("提示：Win+空格 被系统占用，可用 AutoHotkey 把它映射到这里的快捷键。")))
 
-        self.blur = QCheckBox("点击其他窗口时自动隐藏")
+        self.blur = QCheckBox(tr("点击其他窗口时自动隐藏"))
         self.blur.setChecked(self.ctl.cfg.popup.get("hide_on_blur", True))
         self.blur.toggled.connect(lambda v: (self.ctl.cfg.popup.update(hide_on_blur=v), self.ctl.cfg.save()))
         f.addRow("", self.blur)
 
         p = self.ctl.cfg.popup
         self.pos_screen = QComboBox()
-        ident = QPushButton("识别屏幕")
+        ident = QPushButton(tr("识别屏幕"))
         ident.clicked.connect(self.ctl.tray.identify_screens)
         row = QHBoxLayout()
         row.addWidget(self.pos_screen, 1)
         row.addWidget(ident)
-        f.addRow("弹出位置", row)
+        f.addRow(tr("弹出位置"), row)
 
         self.pos_anchor = AnchorPicker(p.get("anchor", "top"))
         self.pos_anchor_label = QLabel()
@@ -358,7 +371,7 @@ class ConsoleWindow(QWidget):
         grid_row.addWidget(self.pos_anchor, 0, Qt.AlignTop)
         side = QVBoxLayout()
         side.addWidget(self.pos_anchor_label)
-        side.addWidget(QLabel("点击格子（或用方向键）\n选择窗口弹出的方位"))
+        side.addWidget(QLabel(tr("点击格子（或用方向键）\n选择窗口弹出的方位")))
         side.addStretch(1)
         grid_row.addLayout(side)
         grid_row.addStretch(1)
@@ -371,11 +384,11 @@ class ConsoleWindow(QWidget):
         self.pos_h = self._spin(240, 4000, p.get("height", 640))
         size = QHBoxLayout()
         for label, sp in (("宽", self.pos_w), ("高", self.pos_h), ("离屏幕边缘", self.pos_margin)):
-            size.addWidget(QLabel(label))
+            size.addWidget(QLabel(tr(label)))
             size.addWidget(sp)
         size.addStretch(1)
-        f.addRow("窗口大小", size)
-        f.addRow("", QLabel("大小按逻辑像素计算，各屏幕缩放比例不同也会显示成同样大小；拖动窗口边缘也会自动保存。"))
+        f.addRow(tr("窗口大小"), size)
+        f.addRow("", QLabel(tr("大小按逻辑像素计算，各屏幕缩放比例不同也会显示成同样大小；拖动窗口边缘也会自动保存。")))
         self._fill_screens()
         self.pos_screen.currentIndexChanged.connect(self._save_placement)
         self.pos_screen.currentIndexChanged.connect(self._sync_picker_aspect)
@@ -383,7 +396,7 @@ class ConsoleWindow(QWidget):
         for sp in (self.pos_margin, self.pos_w, self.pos_h):
             sp.valueChanged.connect(self._save_placement)
 
-        self.autostart = QCheckBox("开机自动启动")
+        self.autostart = QCheckBox(tr("开机自动启动"))
         self.autostart.setChecked(autostart.is_enabled())
         self.autostart.toggled.connect(self._toggle_autostart)
         f.addRow("", self.autostart)
@@ -400,14 +413,14 @@ class ConsoleWindow(QWidget):
         p = self.ctl.cfg.popup
         self.pos_screen.blockSignals(True)
         self.pos_screen.clear()
-        self.pos_screen.addItem("鼠标所在的屏幕", "cursor")
+        self.pos_screen.addItem(tr("鼠标所在的屏幕"), "cursor")
         ids = screen_ids()
         for i, (sid, s) in enumerate(ids.items(), 1):
             g = s.size() * s.devicePixelRatio()
-            self.pos_screen.addItem(f"屏幕 {i}：{friendly_name(s)}（{g.width()}×{g.height()}，"
-                                    f"{s.devicePixelRatio() * 100:.0f}%）", "fixed:" + sid)
+            self.pos_screen.addItem(tr("屏幕 {i}：{name}（{w}×{h}，{scale}%）", i=i, name=friendly_name(s), w=g.width(),
+                                       h=g.height(), scale=f"{s.devicePixelRatio() * 100:.0f}"), "fixed:" + sid)
         if p.get("mode") == "fixed" and p.get("screen_id") not in ids:
-            self.pos_screen.addItem("（之前选的屏幕当前未连接）", "fixed:" + p.get("screen_id", ""))
+            self.pos_screen.addItem(tr("（之前选的屏幕当前未连接）"), "fixed:" + p.get("screen_id", ""))
         cur = "cursor" if p.get("mode") != "fixed" else "fixed:" + p.get("screen_id", "")
         self.pos_screen.setCurrentIndex(max(0, self.pos_screen.findData(cur)))
         self.pos_screen.blockSignals(False)
@@ -422,7 +435,7 @@ class ConsoleWindow(QWidget):
         self.pos_anchor.setAspect(g.width() / max(1, g.height()))
 
     def _update_anchor_label(self):
-        self.pos_anchor_label.setText(f"当前：{ANCHOR_LABELS[self.pos_anchor.anchor()]}")
+        self.pos_anchor_label.setText(tr("当前：{name}", name=tr(ANCHOR_LABELS[self.pos_anchor.anchor()])))
 
     def _save_placement(self, *_):
         mode, _, sid = self.pos_screen.currentData().partition(":")
@@ -435,15 +448,15 @@ class ConsoleWindow(QWidget):
         try:
             autostart.set_enabled(on)
         except OSError as e:
-            QMessageBox.warning(self, "开机自动启动", f"设置失败：{e}")
+            QMessageBox.warning(self, tr("开机自动启动"), tr("设置失败：{e}", e=e))
 
     def _apply_hotkey(self):
         text = self.hotkey.text().strip()
         err = self.ctl.set_hotkey(text)
         if err:
-            QMessageBox.warning(self, "快捷键", err)
+            QMessageBox.warning(self, tr("快捷键"), err)
         else:
-            QMessageBox.information(self, "快捷键", f"已设置为 {text}")
+            QMessageBox.information(self, tr("快捷键"), tr("已设置为 {text}", text=text))
 
     def show_window(self):
         self.refresh()

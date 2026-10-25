@@ -9,6 +9,7 @@ import struct
 import zlib
 from collections import OrderedDict
 
+from .i18n import tr
 from ._ripemd128 import ripemd128  # vendored from zhansliu/writemdict (MIT)
 
 
@@ -27,9 +28,9 @@ def _decompress(block):
         try:
             import lzo  # optional, only very old dictionaries use LZO
         except ImportError:
-            raise MDictError("该词典使用 LZO 压缩，暂不支持")
+            raise MDictError(tr("该词典使用 LZO 压缩，暂不支持"))
         return lzo.decompress(data, initSize=0x100000, blockSize=0x100000)  # noqa
-    raise MDictError(f"未知压缩类型 {kind!r}")
+    raise MDictError(tr("未知压缩类型 {kind}", kind=repr(kind)))
 
 
 def _fast_decrypt(data, key):
@@ -82,7 +83,7 @@ class MDict:
     def read_keys(self):
         """Return [(key, record_offset)] in file order, plus record-section layout."""
         if self.encrypted & 1:
-            raise MDictError("该词典已加密（需要注册码），无法读取")
+            raise MDictError(tr("该词典已加密（需要注册码），无法读取"))
         f = self._f
         f.seek(self.key_section_start)
         n = 5 if self.version >= 2.0 else 4

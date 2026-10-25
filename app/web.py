@@ -18,6 +18,8 @@ from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineUrlRequestJob, QWe
 
 from . import ai_providers
 from .audio import SpeexTranscoder
+from .config import section_name
+from .i18n import tr
 from .theme import THEMES
 
 log = logging.getLogger(__name__)
@@ -147,9 +149,9 @@ function md(src){var out=[],list=false;esc(src).split('\n').forEach(function(l){
 function setSection(id,h){var s=document.getElementById('sec-'+id);if(!s)return;
  if(!h){s.hidden=true;return;} s.querySelector('.sec-body').innerHTML=h; s.hidden=false;}
 function aiSet(t,st,err){var b=document.getElementById('ai-body');if(!b)return;
- if(st==='thinking'&&!t){b.innerHTML='<span class="muted">AI 正在翻译…</span>';return;}
+ if(st==='thinking'&&!t){b.innerHTML='<span class="muted">__AI_BUSY__</span>';return;}
  var h=md(t||'');if(st==='streaming')h+='<span class="cursor">▍</span>';
- if(st==='error')h+='<div class="err">'+esc(err||'出错了')+'</div>';
+ if(st==='error')h+='<div class="err">'+esc(err||'__AI_ERR__')+'</div>';
  b.innerHTML=h;}
 </script>"""
 
@@ -227,8 +229,8 @@ class SchemeHandler(QWebEngineUrlSchemeHandler):
 
     def home_page(self):
         if not self.engine.dicts:
-            return self._page("<div class='msg'>还没有导入词典。<br>右键托盘图标 → <b>设置</b> → <b>导入词典</b>，选择 .mdx 文件。</div>")
-        return self._page("<div class='msg'>输入单词后回车查询。</div>")
+            return self._page("<div class='msg'>" + tr("还没有导入词典。<br>右键托盘图标 → <b>设置</b> → <b>导入词典</b>，选择 .mdx 文件。") + "</div>")
+        return self._page("<div class='msg'>" + tr("输入单词后回车查询。") + "</div>")
 
     def result_page(self, q, force_ai=False):
         q = q.strip()
@@ -242,15 +244,15 @@ class SchemeHandler(QWebEngineUrlSchemeHandler):
 
         builtin = self.sections.wanted(q)
         if not sections and not want_ai and not builtin:
-            return self._page(f"<div class='msg'>本地词典中没有找到 <b>{html.escape(q)}</b>。"
-                              f"<br>（AI 翻译已在设置中停用。）</div>")
+            return self._page("<div class='msg'>" + tr("本地词典中没有找到 <b>{q}</b>。<br>（AI 翻译已在设置中停用。）", q=html.escape(q))
+                              + "</div>")
         lookup_word = word if sections else q
-        parts = [AI_SCRIPT]
+        parts = [AI_SCRIPT.replace("__AI_BUSY__", tr("AI 正在翻译…")).replace("__AI_ERR__", tr("出错了"))]
         pending = []
         if not sections:
-            parts.append(f"<div class='note'>本地词典中没有找到 {html.escape(q)}</div>")
+            parts.append("<div class='note'>" + tr("本地词典中没有找到 {q}", q=html.escape(q)) + "</div>")
         elif word.casefold() != q.casefold():
-            parts.append(f"<div class='note'>未找到 {html.escape(q)}，显示 <b>{html.escape(word)}</b> 的结果</div>")
+            parts.append("<div class='note'>" + tr("未找到 {q}，显示 <b>{word}</b> 的结果", q=html.escape(q), word=html.escape(word)) + "</div>")
         # Clicking "用 AI 翻译" puts the AI section first so it's visible without scrolling.
         if want_ai and sections:
             parts.append(self._ai_section(ai_src, q))
@@ -264,12 +266,12 @@ class SchemeHandler(QWebEngineUrlSchemeHandler):
         if pending:
             self.sectionsNeeded.emit(q, lookup_word, pending)
         if sections and ai_on and not want_ai and self.cfg.data["ai"].get("show_button", True):
-            parts.append(f"<a class='ai-btn' href='{result_url(q, True).toString()}'>用 AI 翻译</a>")
+            parts.append(f"<a class='ai-btn' href='{result_url(q, True).toString()}'>{tr("用 AI 翻译")}</a>")
         return self._page("".join(parts))
 
     def _dict_section(self, src, word, fid):
         collapsed = " collapsed" if src.get("collapsed") else ""
-        name = html.escape(src.get("name") or src["id"])
+        name = html.escape(section_name(src))
         return (f"<div class='sec{collapsed}'><div class='sec-head'><span class='arrow'>▾</span>{name}</div>"
                 f"<iframe id='{fid}' src='mdict://{src['id']}/entry?k={quote(word, safe='')}&fid={fid}'></iframe></div>")
 
@@ -281,16 +283,16 @@ class SchemeHandler(QWebEngineUrlSchemeHandler):
         if cached is None:
             pending.append(src["id"])
         return (f"<div class='sec{collapsed}' id='sec-{src['id']}'{hidden}><div class='sec-head'><span class='arrow'>▾</span>"
-                f"{html.escape(src.get('name') or src['id'])}</div><div class='sec-body'>{cached or ''}</div></div>")
+                f"{html.escape(section_name(src))}</div><div class='sec-body'>{cached or ''}</div></div>")
 
     def _ai_section(self, src, q):
         collapsed = " collapsed" if src.get("collapsed") else ""
         model = html.escape(" · ".join(x for x in (ai_providers.label(self.ai.provider()), self.ai.model()) if x))
-        head = (f"<div class='sec-head'><span class='arrow'>▾</span>{html.escape(src.get('name') or 'AI 翻译')}"
-                f"<span class='ai-tag'>AI 生成，仅供参考{(' · ' + model) if model else ''}</span></div>")
+        head = (f"<div class='sec-head'><span class='arrow'>▾</span>{html.escape(section_name(src))}"
+                f"<span class='ai-tag'>{tr('AI 生成，仅供参考')}{(' · ' + model) if model else ''}</span></div>")
         if not self.ai.configured():
-            body = ("<div class='ai-body'><span class='muted'>尚未设置 AI 翻译的 API Key。<br>"
-                    "右键托盘图标 → <b>设置</b> → <b>AI 翻译</b> 填写后即可使用。</span></div>")
+            body = ("<div class='ai-body'><span class='muted'>"
+                    + tr("尚未设置 AI 翻译的 API Key。<br>右键托盘图标 → <b>设置</b> → <b>AI 翻译</b> 填写后即可使用。") + "</span></div>")
             return f"<div class='sec{collapsed}'>{head}{body}</div>"
         init = ""
         cached = self.ai.cached(q)
@@ -299,7 +301,7 @@ class SchemeHandler(QWebEngineUrlSchemeHandler):
         else:
             self.aiNeeded.emit(q)
         return (f"<div class='sec{collapsed}'>{head}<div id='ai-body' class='ai-body'>"
-                f"<span class='muted'>AI 正在翻译…</span></div></div>{init}")
+                f"<span class='muted'>{tr('AI 正在翻译…')}</span></div></div>{init}")
 
     def entry_doc(self, d, word, fid):
         frags = d.lookup(word)

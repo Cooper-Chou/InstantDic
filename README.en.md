@@ -15,7 +15,7 @@ A Windows dictionary that is nothing but a quick-lookup popup: press a hotkey, t
 - **Examples / synonyms & antonyms / Wikipedia**: Tatoeba English–Chinese example sentences (offline), WordNet + Datamuse, Wikipedia summaries. No AI is used anywhere except the translation fallback.
 - **Your order**: every dictionary, examples, synonyms, Wikipedia and AI translation can be reordered by drag-and-drop, disabled, or collapsed by default.
 - **Multi-monitor friendly**: screens are identified by their EDID, not by Windows' display numbers. Position and DPI are recomputed on every popup and corrected after sleep or screen-off.
-- Light / dark / follow-system theme; type-ahead suggestions; lemmatization (went → go, looked up → look up)
+- Chinese / English interface (follows Windows by default); light / dark / follow-system theme; type-ahead suggestions; lemmatization (went → go, looked up → look up)
 
 ## Install
 
@@ -32,7 +32,7 @@ First run:
 2. On the AI translation (AI 翻译) tab, paste an API key from any supported provider; the provider is detected automatically. Leave the model empty to have one picked for you, or click "Get model list" (获取模型列表) to choose. The key is stored in Windows Credential Manager.
 3. The example-sentence database (about 26 MB) and WordNet (about 11 MB) download automatically on first start.
 
-The interface is currently in Chinese only.
+The interface follows your Windows display language (Chinese or English). You can switch it under Settings → General → Language.
 
 ## Hotkey
 
@@ -62,3 +62,15 @@ The installer is built with [Inno Setup 6](https://jrsoftware.org/isinfo.php) (`
 ## License
 
 The code is MIT-licensed; see [LICENSE](LICENSE). Data sources and third-party components are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Tip: get the Eudic-for-Mac quick-lookup experience
+
+On a Mac, Eudic's quick-lookup window is one keystroke away, and it's very handy. To get the same feel on Windows, I use [AutoHotkey](https://github.com/AutoHotkey/AutoHotkey), an open-source key-remapping tool for Windows, to map **Win+Space** to InstantDic's hotkey **Ctrl+F12**. Pressing Win+Space then brings up the lookup window, just like on the Mac.
+
+After installing AutoHotkey v2, create a `.ahk` file containing the line below and double-click it to run. To have it active at every login, put a shortcut to the file in your Startup folder (press `Win+R` and enter `shell:startup`).
+
+```ahk
+#Space::SendInput "^{F12}"
+```
+
+If you changed the hotkey in Settings, replace `^{F12}` accordingly (`^` is Ctrl, `!` is Alt, `+` is Shift).

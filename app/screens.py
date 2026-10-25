@@ -9,6 +9,8 @@ import logging
 from PySide6.QtCore import QObject, QRect, QSize, QTimer, Signal
 from PySide6.QtGui import QCursor, QGuiApplication
 
+from .i18n import tr
+
 log = logging.getLogger(__name__)
 
 ANCHORS = [
@@ -56,7 +58,7 @@ def describe_screen(s):
 
 
 def friendly_name(s):
-    return s.model() or s.name() or "未知显示器"
+    return s.model() or s.name() or tr("未知显示器")
 
 
 class ScreenManager(QObject):

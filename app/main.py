@@ -16,7 +16,8 @@ from . import autostart, migrate, theme
 from .ai import AiService
 from .datasets import DATASETS, DatasetManager
 from .providers import SectionService
-from .config import DATA_DIR, LOG_DIR, Config
+from .config import DATA_DIR, LOG_DIR, Config, section_name
+from .i18n import set_language, tr
 from .console import ConsoleWindow, default_name
 from .dictionaries import INDEX_DIR, install_index
 from .indexer import IndexService
@@ -45,6 +46,7 @@ class AppController:
     def __init__(self, app):
         self.app = app
         self.cfg = Config()
+        set_language(self.cfg.data.get("language", "system"))
         self.theme_name = theme.apply(app, self.cfg.data.get("theme", "system"))
         QGuiApplication.styleHints().colorSchemeChanged.connect(self._on_system_scheme)
 
@@ -120,7 +122,7 @@ class AppController:
                 err = str(e)
         if err:
             src["error"] = err
-            self.tray.showMessage("InstantDic", f"导入「{src.get('name')}」失败：{err}", QSystemTrayIcon.Warning, 8000)
+            self.tray.showMessage("InstantDic", tr("导入「{name}」失败：{err}", name=section_name(src), err=err), QSystemTrayIcon.Warning, 8000)
         else:
             src.pop("error", None)
             if not src.get("named_by_user"):
@@ -129,9 +131,9 @@ class AppController:
         self.engine.reload()
 
     def _on_dataset_finished(self, name, err):
-        label = DATASETS[name]["label"]
+        label = tr(DATASETS[name]["label"])
         if err:
-            self.tray.showMessage("InstantDic", f"{label} 下载失败：{err}\n下次启动会重试。", QSystemTrayIcon.Warning, 8000)
+            self.tray.showMessage("InstantDic", tr("{label} 下载失败：{err}\n下次启动会重试。", label=label, err=err), QSystemTrayIcon.Warning, 8000)
         else:
             if name == "wordnet":
                 self.sections.providers["thesaurus"].warm_up()
@@ -150,6 +152,14 @@ class AppController:
     def _apply_theme(self):
         self.theme_name = theme.apply(self.app, self.cfg.data.get("theme", "system"))
         self.popup.apply_theme(self.theme_name)
+        self.popup.reload_results()
+
+    def set_language(self, setting):
+        """Result pages and the tray menu switch now; widgets already built switch on restart."""
+        self.cfg.data["language"] = setting
+        self.cfg.save()
+        set_language(setting)
+        self.tray.setToolTip(tr("InstantDic 快捷查词"))
         self.popup.reload_results()
 
     # ---------- actions ----------

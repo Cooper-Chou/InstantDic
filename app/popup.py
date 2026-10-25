@@ -9,6 +9,7 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QCompleter, QFrame, QHBoxLayout, QLabel, QLineEdit, QToolButton, QVBoxLayout, QWidget
 
 from . import winevents
+from .i18n import tr
 from .theme import THEMES
 from .web import ResultPage, result_url
 
@@ -65,12 +66,12 @@ class PopupWindow(QWidget):
         hl.setSpacing(4)
         grip = _Grip("⠿", objectName="grip")
         grip.setCursor(Qt.SizeAllCursor)
-        grip.setToolTip("拖动窗口")
-        self.back = QToolButton(text="←", toolTip="后退 (Alt+←)")
-        self.input = QLineEdit(placeholderText="输入单词或句子，回车查询")
+        grip.setToolTip(tr("拖动窗口"))
+        self.back = QToolButton(text="←", toolTip=tr("后退 (Alt+←)"))
+        self.input = QLineEdit(placeholderText=tr("输入单词或句子，回车查询"))
         self.input.returnPressed.connect(self._on_submit)
         self.input.textEdited.connect(lambda _: self._suggest_timer.start())
-        self.pin = QToolButton(text="📌", checkable=True, toolTip="固定窗口（失焦不隐藏）")
+        self.pin = QToolButton(text="📌", checkable=True, toolTip=tr("固定窗口（失焦不隐藏）"))
         for wdg, stretch in ((grip, 0), (self.back, 0), (self.input, 1), (self.pin, 0)):
             hl.addWidget(wdg, stretch)
         lay.addWidget(header)

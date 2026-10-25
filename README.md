@@ -15,7 +15,7 @@
 - **例句 / 近反义词 / 维基百科**：Tatoeba 中英例句（离线）、WordNet + Datamuse、维基百科摘要。除 AI 翻译外不使用任何 AI
 - **结果顺序可调**：每本词典、例句、近反义词、百科、AI 翻译都能拖动排序、停用、默认折叠
 - **多显示器友好**：按显示器 EDID 而不是 Windows 编号识别屏幕，每次弹出重新计算位置和 DPI，睡眠唤醒、息屏后自动校正
-- 亮色 / 暗色 / 跟随系统主题；联想输入；词形还原（went → go，looked up → look up）
+- 中文 / English 界面（默认跟随系统）；亮色 / 暗色 / 跟随系统主题；联想输入；词形还原（went → go，looked up → look up）
 
 ## 安装
 
@@ -60,3 +60,15 @@ scripts\build.ps1          # 打包到 %USERPROFILE%\.instantdic\build\dist\Inst
 ## 许可
 
 代码采用 MIT 许可证，见 [LICENSE](LICENSE)。用到的数据和第三方组件见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+## 小贴士：获得 Mac 版欧路词典的快捷查词体验
+
+Mac 版欧路词典可以一键呼出快捷查词窗口，非常顺手。为了在 Windows 上获得同样的体验，作者用 [AutoHotkey](https://github.com/AutoHotkey/AutoHotkey)（一个开源的 Windows 按键映射工具）把 **Win+空格** 映射到了 InstantDic 的唤出键 **Ctrl+F12**。这样按 Win+空格 就能呼出查词窗口，和 Mac 上的用法一模一样。
+
+安装 AutoHotkey v2 后，新建一个 `.ahk` 文件，写入下面这一行，双击运行即可。想开机自动生效的话，把这个文件的快捷方式放进「启动」文件夹（`Win+R` 输入 `shell:startup` 打开）。
+
+```ahk
+#Space::SendInput "^{F12}"
+```
+
+如果你在设置里改了唤出键，把上面的 `^{F12}` 换成对应的按键即可（`^` 代表 Ctrl，`!` 代表 Alt，`+` 代表 Shift）。

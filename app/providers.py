@@ -18,6 +18,7 @@ from PySide6.QtCore import QObject, Signal
 
 from . import datasets
 from .ai import is_sentence
+from .i18n import tr
 
 log = logging.getLogger(__name__)
 
@@ -37,9 +38,10 @@ def _word_link(w):
 
 def _downloading(name, mgr):
     if name in mgr.running:
-        return f"<div class='dim'>{datasets.DATASETS[name]['label']} 正在下载，完成后即可使用。</div>"
+        return "<div class='dim'>" + tr("{label} 正在下载，完成后即可使用。", label=tr(datasets.DATASETS[name]["label"])) + "</div>"
     mgr.ensure(name)
-    return f"<div class='dim'>首次使用需要下载 {datasets.DATASETS[name]['label']}（{datasets.DATASETS[name]['size']}），已开始下载。</div>"
+    return ("<div class='dim'>" + tr("首次使用需要下载 {label}（{size}），已开始下载。", label=tr(datasets.DATASETS[name]["label"]),
+                                         size=tr(datasets.DATASETS[name]["size"])) + "</div>")
 
 
 # ---------------------------------------------------------------- examples
@@ -75,7 +77,7 @@ class Examples:
             return html.escape(s).replace("\x01", "<b>").replace("\x02", "</b>")
 
         items = "".join(f"<li><div class='en'>{mark(e)}</div><div class='zh'>{mark(c)}</div></li>" for e, c in rows)
-        return f"<ol class='ex'>{items}</ol><div class='src'>例句来源：Tatoeba（CC-BY 2.0 FR）</div>"
+        return f"<ol class='ex'>{items}</ol><div class='src'>{tr('例句来源：Tatoeba（CC-BY 2.0 FR）')}</div>"
 
 
 # ---------------------------------------------------------------- thesaurus
@@ -144,12 +146,12 @@ class Thesaurus:
         parts = [wn_note]
         for pos, gloss, ws in senses[:6]:
             parts.append(f"<div class='sense'><span class='pos'>{pos}</span> <span class='gloss'>{html.escape(gloss)}</span>"
-                         f"<div class='words'>{'、'.join(_word_link(x) for x in ws)}</div></div>")
+                         f"<div class='words'>{tr('、').join(_word_link(x) for x in ws)}</div></div>")
         if extra_syn:
-            parts.append(f"<div class='row'><span class='lbl'>近义</span>{'、'.join(_word_link(x) for x in extra_syn)}</div>")
+            parts.append(f"<div class='row'><span class='lbl'>{tr('近义')}</span>{tr('、').join(_word_link(x) for x in extra_syn)}</div>")
         if antonyms:
-            parts.append(f"<div class='row'><span class='lbl ant'>反义</span>{'、'.join(_word_link(x) for x in antonyms[:12])}</div>")
-        parts.append("<div class='src'>来源：WordNet、Datamuse</div>")
+            parts.append(f"<div class='row'><span class='lbl ant'>{tr('反义')}</span>{tr('、').join(_word_link(x) for x in antonyms[:12])}</div>")
+        parts.append("<div class='src'>" + tr("来源：WordNet、Datamuse") + "</div>")
         return "".join(parts)
 
 
@@ -199,7 +201,7 @@ class Wikipedia:
             link = data.get("content_urls", {}).get("desktop", {}).get("page", "")
             parts.append(f"<div class='wiki {cls}'><div class='title'><a href='{html.escape(link)}'>"
                          f"{html.escape(data['title'])}</a></div><div class='extract'>{html.escape(data['extract'])}</div></div>")
-        parts.append("<div class='src' style='clear:both'>来源：维基百科（CC BY-SA）</div>")
+        parts.append("<div class='src' style='clear:both'>" + tr("来源：维基百科（CC BY-SA）") + "</div>")
         return "".join(parts)
 
 

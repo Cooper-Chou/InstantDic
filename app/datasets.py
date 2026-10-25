@@ -15,6 +15,7 @@ import urllib.request
 from PySide6.QtCore import QObject, Signal
 
 from .config import DATA_DIR
+from .i18n import tr
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ def _download(url, progress, label):
                 break
             buf.write(chunk)
             if total:
-                progress(f"下载 {label} {buf.tell() * 100 // total}%")
+                progress(tr("下载 {label} {pct}%", label=label, pct=buf.tell() * 100 // total))
     return buf.getvalue()
 
 
@@ -59,16 +60,16 @@ def _tsv(data):
 
 
 def build_examples(progress):
-    links = _download(f"{TATOEBA}/eng/eng-cmn_links.tsv.bz2", progress, "对照表")
+    links = _download(f"{TATOEBA}/eng/eng-cmn_links.tsv.bz2", progress, tr("对照表"))
     pairs = [(int(r[0]), int(r[1])) for r in _tsv(links) if len(r) >= 2]
-    cmn = {int(r[0]): r[2] for r in _tsv(_download(f"{TATOEBA}/cmn/cmn_sentences.tsv.bz2", progress, "中文句子"))
+    cmn = {int(r[0]): r[2] for r in _tsv(_download(f"{TATOEBA}/cmn/cmn_sentences.tsv.bz2", progress, tr("中文句子")))
            if len(r) >= 3}
     wanted = {e for e, _ in pairs}
     eng = {}
-    for r in _tsv(_download(f"{TATOEBA}/eng/eng_sentences.tsv.bz2", progress, "英文句子")):
+    for r in _tsv(_download(f"{TATOEBA}/eng/eng_sentences.tsv.bz2", progress, tr("英文句子"))):
         if len(r) >= 3 and int(r[0]) in wanted:
             eng[int(r[0])] = r[2]
-    progress("建立例句索引")
+    progress(tr("建立例句索引"))
     from opencc import OpenCC  # Tatoeba mixes traditional and simplified Chinese
     t2s = OpenCC("t2s")
     DATA.mkdir(parents=True, exist_ok=True)

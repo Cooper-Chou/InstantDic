@@ -10,6 +10,8 @@ from ctypes import wintypes
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QWidget
 
+from .i18n import tr
+
 log = logging.getLogger(__name__)
 
 user32 = ctypes.WinDLL("user32", use_last_error=True)
@@ -79,7 +81,7 @@ def parse_hotkey(text):
         if low in _MODS:
             mods |= _MODS[low]
         elif vk is not None:
-            raise ValueError(f"快捷键里只能有一个非修饰键：{text}")
+            raise ValueError(tr("快捷键里只能有一个非修饰键：{text}", text=text))
         elif low in _KEYS:
             vk = _KEYS[low]
         elif len(low) == 1 and low.isalnum():
@@ -87,9 +89,9 @@ def parse_hotkey(text):
         elif low.startswith("f") and low[1:].isdigit() and 1 <= int(low[1:]) <= 24:
             vk = 0x70 + int(low[1:]) - 1
         else:
-            raise ValueError(f"无法识别的按键：{part}")
+            raise ValueError(tr("无法识别的按键：{part}", part=part))
     if vk is None:
-        raise ValueError(f"快捷键缺少主键：{text}")
+        raise ValueError(tr("快捷键缺少主键：{text}", text=text))
     return mods, vk
 
 
@@ -118,8 +120,8 @@ class SystemEvents(QWidget):
         if not user32.RegisterHotKey(self.hwnd, self.HOTKEY_ID, mods | MOD_NOREPEAT, vk):
             err = ctypes.get_last_error()
             if err == ERROR_HOTKEY_ALREADY_REGISTERED:
-                return f"快捷键 {text} 已被其他程序占用（例如 EasyDict），请先关闭它或换一个快捷键。"
-            return f"注册快捷键 {text} 失败（错误码 {err}）。"
+                return tr("快捷键 {text} 已被其他程序占用（例如 EasyDict），请先关闭它或换一个快捷键。", text=text)
+            return tr("注册快捷键 {text} 失败（错误码 {err}）。", text=text, err=err)
         self._hotkey = text
         log.info("hotkey registered: %s", text)
         return None

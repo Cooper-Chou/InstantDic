@@ -15,6 +15,7 @@ from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequ
 
 from . import ai_providers
 from .config import DATA_DIR
+from .i18n import tr
 
 log = logging.getLogger(__name__)
 
@@ -120,7 +121,7 @@ class AiService(QObject):
         rid = self._next_id
         key = get_api_key()
         if not key:
-            QTimer.singleShot(0, lambda: self.update.emit(rid, "", "error", "尚未设置 AI 翻译的 API Key"))
+            QTimer.singleShot(0, lambda: self.update.emit(rid, "", "error", tr("尚未设置 AI 翻译的 API Key")))
             return rid
         if not self.model():
             # First use: pick the provider's cheap/fast model from the account's model list, then start.
@@ -131,11 +132,11 @@ class AiService(QObject):
 
     def _after_autopick(self, rid, q, models, err):
         if err or not models:
-            self.update.emit(rid, "", "error", err or "无法获取模型列表，请在设置中手动填写模型名")
+            self.update.emit(rid, "", "error", err or tr("无法获取模型列表，请在设置中手动填写模型名"))
             return
         pick = ai_providers.pick_model(self.provider(), models)
         if not pick:
-            self.update.emit(rid, "", "error", "没有找到可用的对话模型，请在设置中手动填写模型名")
+            self.update.emit(rid, "", "error", tr("没有找到可用的对话模型，请在设置中手动填写模型名"))
             return
         log.info("auto-selected model %s from %s", pick, models)
         self.ai_cfg["model"] = pick
@@ -233,7 +234,7 @@ class AiService(QObject):
                  (time.perf_counter() - st["t0"]) * 1000, len(text))
         if text:
             self.cache.put(st["q"], st["mode"], st["model"], text)
-        self.update.emit(rid, text, "done", "" if text else "AI 没有返回内容")
+        self.update.emit(rid, text, "done", "" if text else tr("AI 没有返回内容"))
 
     @staticmethod
     def _error_message(status, reply, body):
@@ -245,17 +246,17 @@ class AiService(QObject):
         known = {401: "API Key 无效，请在设置中检查（也可能是选错了服务商）", 402: "账户余额不足", 403: "没有权限使用该模型或接口", 429: "请求太频繁，请稍后再试",
                  400: "请求格式错误（模型名可能不对）", 404: "接口地址或模型名不存在"}
         if status in known:
-            return known[status] + (f"（{detail}）" if detail else "")
+            return tr(known[status]) + (f"（{detail}）" if detail else "")
         if reply.error() == QNetworkReply.OperationCanceledError:
-            return "请求超时"
-        return f"网络错误：{reply.errorString()}" + (f"（{detail}）" if detail else "")
+            return tr("请求超时")
+        return tr("网络错误：{e}", e=reply.errorString()) + (f"（{detail}）" if detail else "")
 
     # ---------- model list ----------
     def list_models(self, callback, key=None):
         """callback(models: list[str], error: str)"""
         key = key or get_api_key()
         if not key:
-            callback([], "尚未设置 API Key")
+            callback([], tr("尚未设置 API Key"))
             return
         reply = self.net.get(self._request("/models", key))
 
@@ -268,7 +269,7 @@ class AiService(QObject):
                 try:
                     callback(sorted(m["id"] for m in json.loads(body)["data"]), "")
                 except (ValueError, KeyError, TypeError):
-                    callback([], "模型列表格式无法识别")
+                    callback([], tr("模型列表格式无法识别"))
             reply.deleteLater()
 
         reply.finished.connect(done)

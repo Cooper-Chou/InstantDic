@@ -16,6 +16,7 @@ CONFIG_PATH = DATA_DIR / "config.json"
 DEFAULTS = {
     "hotkey": "Ctrl+F12",
     "theme": "system",         # "system" / "light" / "dark"
+    "language": "system",      # "system" / "zh" / "en"
     # Result sections in display order: dictionaries ({"id","type":"mdx","name","path","enabled","collapsed"})
     # and built-in sources (BUILTIN_SOURCES), all reorderable in the Console.
     "sources": [],
@@ -45,6 +46,15 @@ BUILTIN_SOURCES = [
     {"id": "wiki", "type": "builtin", "name": "维基百科", "enabled": True, "collapsed": False},
     {"id": "ai", "type": "ai", "name": "AI 翻译", "enabled": True, "collapsed": False},
 ]
+
+
+def section_name(src):
+    """Display name: user-chosen names as-is, built-in default names in the UI language."""
+    from .i18n import tr
+    name = src.get("name") or src["id"]
+    if src.get("type") != "mdx" and any(b["id"] == src["id"] and b["name"] == name for b in BUILTIN_SOURCES):
+        return tr(name)
+    return name
 
 
 def _merge(base, override):

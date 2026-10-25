@@ -46,7 +46,8 @@ _NON_CHAT = re.compile(r"embed|whisper|tts|audio|realtime|dall-e|image|moderatio
 
 
 def label(pid):
-    return PROVIDERS.get(pid, PROVIDERS["custom"])[0]
+    from .i18n import tr
+    return tr(PROVIDERS.get(pid, PROVIDERS["custom"])[0])
 
 
 def base_url(pid):

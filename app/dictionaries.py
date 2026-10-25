@@ -8,6 +8,7 @@ import sqlite3
 from pathlib import Path
 
 from .config import DATA_DIR
+from .i18n import tr
 from .mdict import MDict
 
 log = logging.getLogger(__name__)
@@ -61,7 +62,7 @@ def build_index(mdx_path, db_path, progress=lambda msg: None):
     files = [mdx_path] + mdd_volumes(mdx_path)
     for vol, path in enumerate(files):
         is_mdd = vol > 0
-        progress(f"读取 {os.path.basename(path)}")
+        progress(tr("读取 {name}", name=os.path.basename(path)))
         m = MDict(path, is_mdd=is_mdd)
         try:
             keys = m.read_keys()
@@ -83,7 +84,7 @@ def build_index(mdx_path, db_path, progress=lambda msg: None):
                             ((k, norm_key(k), o, end_of(o)) for k, o in keys))
         con.executemany("INSERT INTO layout VALUES (?,?,?,?,?,?)",
                         ((vol, i, *b) for i, b in enumerate(m.record_layout)))
-    progress("建立索引")
+    progress(tr("建立索引"))
     con.executescript("""
         CREATE INDEX entries_norm ON entries(norm);
         CREATE INDEX resources_norm ON resources(norm);

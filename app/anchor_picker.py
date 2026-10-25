@@ -3,6 +3,7 @@ from PySide6.QtCore import QRectF, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QSizePolicy, QToolTip, QWidget
 
+from .i18n import tr
 from .screens import ANCHOR_LABELS, ANCHORS
 
 
@@ -127,7 +128,7 @@ class AnchorPicker(QWidget):
             self._hover = i
             self.update()
             if i is not None:
-                QToolTip.showText(e.globalPosition().toPoint(), ANCHOR_LABELS[ANCHORS[i]], self)
+                QToolTip.showText(e.globalPosition().toPoint(), tr(ANCHOR_LABELS[ANCHORS[i]]), self)
 
     def leaveEvent(self, _):
         self._hover = None

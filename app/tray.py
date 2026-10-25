@@ -6,6 +6,7 @@ from PySide6.QtGui import QAction, QActionGroup, QColor, QFont, QIcon, QPainter,
 from PySide6.QtWidgets import QLabel, QMenu, QSystemTrayIcon
 
 from .config import LOG_DIR
+from .i18n import tr
 from .icon import make_icon
 from .theme import THEME_LABELS
 from .screens import friendly_name, screen_ids
@@ -31,7 +32,7 @@ class Tray(QSystemTrayIcon):
     def __init__(self, app_ctl):
         super().__init__(make_icon())
         self.ctl = app_ctl
-        self.setToolTip("InstantDic 快捷查词")
+        self.setToolTip(tr("InstantDic 快捷查词"))
         self.menu = QMenu()
         self.menu.aboutToShow.connect(self._rebuild)
         self.setContextMenu(self.menu)
@@ -46,21 +47,21 @@ class Tray(QSystemTrayIcon):
     def _rebuild(self):
         m = self.menu
         m.clear()
-        m.addAction(f"打开查词窗口\t{self.ctl.cfg.data['hotkey']}", self.ctl.show_popup)
-        m.addAction("设置（词典、排序、快捷键）…", self.ctl.show_console)
+        m.addAction(tr("打开查词窗口") + "\t" + self.ctl.cfg.data["hotkey"], self.ctl.show_popup)
+        m.addAction(tr("设置（词典、排序、快捷键）…"), self.ctl.show_console)
         m.addSeparator()
-        self._build_theme(m.addMenu("主题"))
-        m.addAction("识别屏幕", self.identify_screens)
-        m.addAction("重置窗口", self.ctl.reset_popup)
+        self._build_theme(m.addMenu(tr("主题")))
+        m.addAction(tr("识别屏幕"), self.identify_screens)
+        m.addAction(tr("重置窗口"), self.ctl.reset_popup)
         m.addSeparator()
-        m.addAction("打开日志文件夹", lambda: os.startfile(LOG_DIR))
-        m.addAction("退出", self.ctl.quit)
+        m.addAction(tr("打开日志文件夹"), lambda: os.startfile(LOG_DIR))
+        m.addAction(tr("退出"), self.ctl.quit)
 
     def _build_theme(self, menu):
         group = QActionGroup(menu)
         current = self.ctl.cfg.data.get("theme", "system")
         for key, label in THEME_LABELS.items():
-            act = QAction(label, menu, checkable=True)
+            act = QAction(tr(label), menu, checkable=True)
             act.setChecked(key == current)
             act.triggered.connect(lambda _=False, k=key: self.ctl.set_theme(k))
             group.addAction(act)
@@ -68,6 +69,6 @@ class Tray(QSystemTrayIcon):
 
     def identify_screens(self):
         self._overlays = [
-            _ScreenLabel(s, f"屏幕 {i}\n{friendly_name(s)}\n{s.devicePixelRatio() * 100:.0f}%")
+            _ScreenLabel(s, tr("屏幕 {i}", i=i) + f"\n{friendly_name(s)}\n{s.devicePixelRatio() * 100:.0f}%")
             for i, s in enumerate(screen_ids().values(), 1)
         ]
