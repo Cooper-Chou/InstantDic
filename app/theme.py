@@ -65,6 +65,15 @@ QCheckBox::indicator, QListView::indicator {{ width: 13px; height: 13px; border:
             border-radius: 3px; background: {c['input_bg']}; }}
 QCheckBox::indicator:checked, QListView::indicator:checked {{ image: url({check}); border: none; background: transparent; }}
 QCheckBox::indicator:hover, QListView::indicator:hover {{ border-color: {c['accent']}; }}
+#listPage, #suggest {{ background: {c['bg']}; border: none; }}
+#suggest::item {{ color: {c['text']}; border: none; }}
+#suggest::item:hover {{ background: {c['hover']}; }}
+#suggest::item:selected {{ background: {c['selection']}; }}
+#historyBar {{ background: {c['bg']}; border-bottom: 1px solid {c['border']}; }}
+#dim, #listEmpty, #rowIcon {{ color: {c['muted']}; }}
+#listEmpty {{ padding-top: 24px; background: {c['bg']}; }}
+#rowDelete {{ color: {c['muted']}; font-size: 15px; padding: 0 6px; }}
+#rowDelete:hover {{ color: #e5484d; background: {c['hover']}; }}
 QMenu {{ background: {c['panel']}; color: {c['text']}; border: 1px solid {c['border']}; }}
 QMenu::item:selected {{ background: {c['hover']}; }}
 """

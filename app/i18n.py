@@ -69,6 +69,10 @@ EN = {
     "后退 (Alt+←)": "Back (Alt+←)",
     "输入单词或句子，回车查询": "Type a word or sentence, press Enter",
     "固定窗口（失焦不隐藏）": "Pin window (don't hide when focus is lost)",
+    "搜索记录": "Recent searches",
+    "清空": "Clear all",
+    "还没有搜索记录": "No recent searches yet",
+    "删除这条记录（Shift+Delete）": "Remove from history (Shift+Delete)",
     # --- main / notifications
     "导入「{name}」失败：{err}": "Importing \"{name}\" failed: {err}",
     "{label} 下载失败：{err}\n下次启动会重试。": "Downloading {label} failed: {err}\nIt will be retried on next start.",

@@ -20,6 +20,7 @@ from .config import DATA_DIR, LOG_DIR, Config, section_name
 from .i18n import LANG_LABELS, first_run_default, set_language, tr
 from .console import ConsoleWindow, default_name
 from .dictionaries import INDEX_DIR, install_index
+from .history import History
 from .indexer import IndexService
 from .lookup import LookupEngine
 from .popup import PopupWindow
@@ -54,6 +55,7 @@ class AppController:
         QGuiApplication.styleHints().colorSchemeChanged.connect(self._on_system_scheme)
 
         self.engine = LookupEngine(self.cfg)
+        self.history = History()
         self.indexer = IndexService()
         self.indexer.finished.connect(self._on_index_finished)
         self.profile = QWebEngineProfile.defaultProfile()
@@ -102,8 +104,8 @@ class AppController:
             self.indexer.build(src)
 
     def _make_popup(self):
-        self.popup = PopupWindow(self.cfg, self.screens, self.engine, self.ai, self.sections, self.theme_name,
-                                 self.profile)
+        self.popup = PopupWindow(self.cfg, self.screens, self.engine, self.ai, self.sections, self.history,
+                                 self.theme_name, self.profile)
         self.popup.userResized.connect(self._save_size)
         self.popup.broken.connect(self.reset_popup)
 

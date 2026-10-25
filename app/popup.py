@@ -3,10 +3,11 @@ import json
 import logging
 import time
 
-from PySide6.QtCore import QEvent, QPoint, QSize, QStringListModel, Qt, QTimer, QUrl, QUrlQuery, Signal
+from PySide6.QtCore import QEvent, QPoint, QSize, Qt, QTimer, QUrl, QUrlQuery, Signal
 from PySide6.QtGui import QColor, QKeySequence, QShortcut
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtWidgets import QCompleter, QFrame, QHBoxLayout, QLabel, QLineEdit, QToolButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QStackedWidget,
+                               QToolButton, QVBoxLayout, QWidget)
 
 from . import winevents
 from .i18n import tr
@@ -16,7 +17,8 @@ from .web import ResultPage, result_url
 log = logging.getLogger(__name__)
 
 EDGE = 5  # px of window margin used as resize handle
-SUGGEST_DEBOUNCE_MS = 150
+SUGGEST_DEBOUNCE_MS = 120
+KIND_ROLE = Qt.UserRole + 1  # "history" / "suggest"
 
 
 class _Grip(QLabel):
@@ -31,13 +33,14 @@ class PopupWindow(QWidget):
     userResized = Signal(QSize)
     broken = Signal()  # geometry could not be fixed; owner should recreate the window
 
-    def __init__(self, cfg, screens, engine, ai, sections, theme_name, profile):
+    def __init__(self, cfg, screens, engine, ai, sections, history, theme_name, profile):
         flags = Qt.Window | Qt.FramelessWindowHint | Qt.Tool
         if cfg.popup.get("stay_on_top", True):
             flags |= Qt.WindowStaysOnTopHint
         super().__init__(None, flags)
         self.cfg, self.screens, self.engine, self.ai = cfg, screens, engine, ai
-        self.sections = sections
+        self.sections, self.history = sections, history
+        self._list_nav = False  # user moved the selection in the list with the arrow keys
         self._ai_rid = None
         self._ai_state = None
         self._sec_state = None  # {"q": query, "items": {source id: html}}
@@ -70,22 +73,37 @@ class PopupWindow(QWidget):
         self.back = QToolButton(text="←", toolTip=tr("后退 (Alt+←)"))
         self.input = QLineEdit(placeholderText=tr("输入单词或句子，回车查询"))
         self.input.returnPressed.connect(self._on_submit)
-        self.input.textEdited.connect(lambda _: self._suggest_timer.start())
+        self.input.textEdited.connect(self._on_text_edited)
+        self.input.installEventFilter(self)
         self.pin = QToolButton(text="📌", checkable=True, toolTip=tr("固定窗口（失焦不隐藏）"))
         for wdg, stretch in ((grip, 0), (self.back, 0), (self.input, 1), (self.pin, 0)):
             hl.addWidget(wdg, stretch)
         lay.addWidget(header)
 
-        # Suggestions: only refresh after typing pauses for SUGGEST_DEBOUNCE_MS.
-        self._suggest_model = QStringListModel(self)
-        self.completer = QCompleter(self._suggest_model, self)
-        self.completer.setCaseSensitivity(Qt.CaseInsensitive)
-        self.completer.setCompletionMode(QCompleter.UnfilteredPopupCompletion)
-        self.completer.setMaxVisibleItems(10)
-        self.completer.activated.connect(self._on_suggestion)
-        self.input.setCompleter(self.completer)
+        # Content area has two pages: the suggestion/history list and the result view. Any edit to
+        # the query switches to the list; a lookup switches back to results.
+        self.stack = QStackedWidget()
+        list_page = QWidget(objectName="listPage")
+        lp = QVBoxLayout(list_page)
+        lp.setContentsMargins(0, 0, 0, 0)
+        lp.setSpacing(0)
+        self.history_bar = QFrame(objectName="historyBar")
+        hb = QHBoxLayout(self.history_bar)
+        hb.setContentsMargins(12, 4, 6, 4)
+        hb.addWidget(QLabel(tr("搜索记录"), objectName="dim"), 1)
+        clear_all = QToolButton(text=tr("清空"))
+        clear_all.clicked.connect(self._clear_history)
+        hb.addWidget(clear_all)
+        lp.addWidget(self.history_bar)
+        self.list = QListWidget(objectName="suggest")
+        self.list.setFocusPolicy(Qt.NoFocus)  # keyboard stays in the search box
+        self.list.itemClicked.connect(self._on_list_item)
+        lp.addWidget(self.list, 1)
+        self.list_empty = QLabel("", objectName="listEmpty")
+        self.list_empty.setAlignment(Qt.AlignHCenter | Qt.AlignTop)
+        lp.addWidget(self.list_empty, 1)
         self._suggest_timer = QTimer(self, singleShot=True, interval=SUGGEST_DEBOUNCE_MS)
-        self._suggest_timer.timeout.connect(self._refresh_suggestions)
+        self._suggest_timer.timeout.connect(lambda: self._refresh_list(with_dictionary=True))
 
         self.view = QWebEngineView()
         self.page = ResultPage(profile, self.view)
@@ -95,7 +113,10 @@ class PopupWindow(QWidget):
         ai.update.connect(self._on_ai_update)
         sections.ready.connect(self._on_section_ready)
         self.back.clicked.connect(self.view.back)
-        lay.addWidget(self.view, 1)
+        self.stack.addWidget(list_page)
+        self.stack.addWidget(self.view)
+        self.stack.setCurrentWidget(self.view)
+        lay.addWidget(self.stack, 1)
         self.apply_theme(theme_name)
         # Pre-warm Chromium now so the first hotkey press shows instantly.
         self.view.load(QUrl("mdict://app/home"))
@@ -131,6 +152,8 @@ class PopupWindow(QWidget):
             QTimer.singleShot(60, self._retry_foreground)
         self.input.setFocus()
         self.input.selectAll()
+        if not self.input.text().strip() and self.history.items:
+            self._show_list()  # nothing looked up yet: offer recent searches
         self._shown_at = time.perf_counter()
         log.info("popup shown in %.0f ms", (self._shown_at - t0) * 1000)
         self._fix_attempts = 0
@@ -144,7 +167,6 @@ class PopupWindow(QWidget):
             self.input.setFocus()
 
     def hide_popup(self):
-        self.completer.popup().hide()
         self.hide()
 
     # ---------- geometry ----------
@@ -232,32 +254,106 @@ class PopupWindow(QWidget):
             QTimer.singleShot(0, self._hide_if_still_inactive)
 
     def _hide_if_still_inactive(self):
-        # The suggestion list is its own window; clicking it must not hide the popup.
-        if not self.isActiveWindow() and not self.completer.popup().isVisible():
+        if not self.isActiveWindow():
             self.hide_popup()
 
     # ---------- lookup ----------
-    def _refresh_suggestions(self):
-        text = self.input.text().strip()
-        items = self.engine.suggest(text) if text else []
-        self._suggest_model.setStringList(items)
-        if items and self.input.hasFocus():
-            self.completer.complete()
-        else:
-            self.completer.popup().hide()
+    # ---------- suggestion / history list ----------
+    def _on_text_edited(self, _text):
+        self._show_list()
+        self._suggest_timer.start()  # dictionary suggestions once typing pauses
 
-    def _on_suggestion(self, text):
-        self.input.setText(text)
-        self.lookup(text)
+    def _show_list(self):
+        self._list_nav = False
+        self._refresh_list(with_dictionary=False)  # history matches right away
+        self.stack.setCurrentIndex(0)
+
+    def _refresh_list(self, with_dictionary):
+        text = self.input.text().strip()
+        self.list.clear()
+        if not text:
+            rows = [(h, "history") for h in self.history.items]
+        else:
+            hist = self.history.matching(text)
+            rows = [(h, "history") for h in hist]
+            if with_dictionary:
+                seen = {h.casefold() for h in hist}
+                rows += [(w, "suggest") for w in self.engine.suggest(text) if w.casefold() not in seen]
+        for word, kind in rows:
+            self._add_row(word, kind)
+        self.history_bar.setVisible(not text and bool(rows))
+        self.list.setVisible(bool(rows))
+        self.list_empty.setVisible(not rows)
+        self.list_empty.setText("" if text else tr("还没有搜索记录"))
+
+    def _add_row(self, word, kind):
+        item = QListWidgetItem()
+        item.setData(Qt.UserRole, word)
+        item.setData(KIND_ROLE, kind)
+        self.list.addItem(item)
+        row = QWidget()
+        rl = QHBoxLayout(row)
+        rl.setContentsMargins(12, 0, 4, 0)
+        rl.setSpacing(6)
+        icon = QLabel("🕘" if kind == "history" else "", objectName="rowIcon")
+        icon.setFixedWidth(16)
+        rl.addWidget(icon)
+        rl.addWidget(QLabel(word), 1)
+        if kind == "history":
+            rm = QToolButton(text="×", objectName="rowDelete", toolTip=tr("删除这条记录（Shift+Delete）"))
+            rm.clicked.connect(lambda _=False, w=word: self._remove_history(w))
+            rl.addWidget(rm)
+        item.setSizeHint(QSize(0, 30))
+        self.list.setItemWidget(item, row)
+
+    def _on_list_item(self, item):
+        word = item.data(Qt.UserRole)
+        self.input.setText(word)
+        self.lookup(word)
+
+    def _remove_history(self, word):
+        row = self.list.currentRow()
+        self.history.remove(word)
+        self._refresh_list(with_dictionary=bool(self.input.text().strip()))
+        if self._list_nav and self.list.count():
+            self.list.setCurrentRow(min(row, self.list.count() - 1))
+        self.input.setFocus()
+
+    def _clear_history(self):
+        self.history.clear()
+        self._refresh_list(with_dictionary=False)
+        self.input.setFocus()
+
+    def eventFilter(self, obj, e):
+        # Arrow keys / Shift+Delete in the search box drive the list while it is showing.
+        if obj is self.input and e.type() == QEvent.KeyPress and self.stack.currentIndex() == 0:
+            key, n = e.key(), self.list.count()
+            if key in (Qt.Key_Down, Qt.Key_Up) and n:
+                cur = self.list.currentRow() if self._list_nav else -1
+                cur = (cur + 1) % n if key == Qt.Key_Down else (cur - 1) % n
+                self.list.setCurrentRow(cur)
+                self.list.scrollToItem(self.list.item(cur))
+                self._list_nav = True
+                return True
+            if key == Qt.Key_Delete and e.modifiers() & Qt.ShiftModifier and self._list_nav:
+                item = self.list.currentItem()
+                if item is not None and item.data(KIND_ROLE) == "history":
+                    self._remove_history(item.data(Qt.UserRole))
+                    return True
+        return super().eventFilter(obj, e)
 
     def _on_submit(self):
         self._suggest_timer.stop()
-        self.completer.popup().hide()
+        item = self.list.currentItem() if self.stack.currentIndex() == 0 and self._list_nav else None
+        if item is not None:
+            self.input.setText(item.data(Qt.UserRole))
         self.lookup(self.input.text())
 
     def lookup(self, text):
         q = text.strip()
         if q:
+            self.history.add(q)
+            self.stack.setCurrentWidget(self.view)
             self.view.load(result_url(q))
             self.input.selectAll()
 
