@@ -34,3 +34,8 @@ def set_enabled(on, value=VALUE):
                 winreg.DeleteValue(k, value)
             except FileNotFoundError:
                 pass
+
+
+def should_refresh():
+    """Only a packaged build outside a test data folder may rewrite the autostart entry on start."""
+    return getattr(sys, "frozen", False) and not os.environ.get("INSTANTDIC_DATA_DIR")

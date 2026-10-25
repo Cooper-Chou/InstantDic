@@ -4,11 +4,13 @@ import os
 from pathlib import Path
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QFileDialog, QFormLayout,
                                QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-                               QMessageBox, QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget)
+                               QMessageBox, QPushButton, QSizePolicy, QSpinBox, QTabWidget, QVBoxLayout, QWidget)
 
 from . import ai_providers, autostart
+from .anchor_picker import AnchorPicker
 from .dictionaries import INDEX_DIR, source_id_for
 from .screens import ANCHOR_LABELS, ANCHORS, friendly_name, screen_ids
 from .theme import THEME_LABELS
@@ -340,17 +342,29 @@ class ConsoleWindow(QWidget):
 
         p = self.ctl.cfg.popup
         self.pos_screen = QComboBox()
-        self.pos_anchor = QComboBox()
-        for a in ANCHORS:
-            self.pos_anchor.addItem(ANCHOR_LABELS[a], a)
-        self.pos_anchor.setCurrentIndex(self.pos_anchor.findData(p.get("anchor", "top")))
         ident = QPushButton("识别屏幕")
         ident.clicked.connect(self.ctl.tray.identify_screens)
         row = QHBoxLayout()
         row.addWidget(self.pos_screen, 1)
-        row.addWidget(self.pos_anchor)
         row.addWidget(ident)
         f.addRow("弹出位置", row)
+
+        self.pos_anchor = AnchorPicker(p.get("anchor", "top"))
+        self.pos_anchor_label = QLabel()
+        self.pos_anchor_label.setStyleSheet("color: palette(placeholder-text);")
+        grid = QWidget()
+        grid_row = QHBoxLayout(grid)
+        grid_row.setContentsMargins(0, 2, 0, 2)
+        grid_row.addWidget(self.pos_anchor, 0, Qt.AlignTop)
+        side = QVBoxLayout()
+        side.addWidget(self.pos_anchor_label)
+        side.addWidget(QLabel("点击格子（或用方向键）\n选择窗口弹出的方位"))
+        side.addStretch(1)
+        grid_row.addLayout(side)
+        grid_row.addStretch(1)
+        grid.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        f.addRow("", grid)
+        self._update_anchor_label()
 
         self.pos_margin = self._spin(0, 400, p.get("margin", 40))
         self.pos_w = self._spin(320, 4000, p.get("width", 520))
@@ -364,7 +378,8 @@ class ConsoleWindow(QWidget):
         f.addRow("", QLabel("大小按逻辑像素计算，各屏幕缩放比例不同也会显示成同样大小；拖动窗口边缘也会自动保存。"))
         self._fill_screens()
         self.pos_screen.currentIndexChanged.connect(self._save_placement)
-        self.pos_anchor.currentIndexChanged.connect(self._save_placement)
+        self.pos_screen.currentIndexChanged.connect(self._sync_picker_aspect)
+        self.pos_anchor.anchorChanged.connect(lambda _: (self._update_anchor_label(), self._save_placement()))
         for sp in (self.pos_margin, self.pos_w, self.pos_h):
             sp.valueChanged.connect(self._save_placement)
 
@@ -396,10 +411,22 @@ class ConsoleWindow(QWidget):
         cur = "cursor" if p.get("mode") != "fixed" else "fixed:" + p.get("screen_id", "")
         self.pos_screen.setCurrentIndex(max(0, self.pos_screen.findData(cur)))
         self.pos_screen.blockSignals(False)
+        self._sync_picker_aspect()
+
+    def _sync_picker_aspect(self, *_):
+        """Draw the nine-cell picker in the shape of the chosen monitor (cursor mode: primary)."""
+        mode, _, sid = (self.pos_screen.currentData() or "cursor").partition(":")
+        s = screen_ids().get(sid) if mode == "fixed" else None
+        s = s or QGuiApplication.primaryScreen()
+        g = s.availableGeometry()
+        self.pos_anchor.setAspect(g.width() / max(1, g.height()))
+
+    def _update_anchor_label(self):
+        self.pos_anchor_label.setText(f"当前：{ANCHOR_LABELS[self.pos_anchor.anchor()]}")
 
     def _save_placement(self, *_):
         mode, _, sid = self.pos_screen.currentData().partition(":")
-        self.ctl.cfg.popup.update(mode=mode, screen_id=sid, anchor=self.pos_anchor.currentData(),
+        self.ctl.cfg.popup.update(mode=mode, screen_id=sid, anchor=self.pos_anchor.anchor(),
                                   margin=self.pos_margin.value(), width=self.pos_w.value(), height=self.pos_h.value())
         self.ctl.cfg.save()
         self.ctl.popup.on_screens_settled()

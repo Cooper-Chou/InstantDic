@@ -84,9 +84,10 @@ class AppController:
             if any(s["id"] == sid and s.get("enabled", True) for s in self.cfg.data["sources"]):
                 self.datasets.ensure(name)
 
-        # Keep the autostart entry pointing at whatever build is running now (installer, zip, local build).
+        # Keep the autostart entry pointing at whatever packaged build is running now (installer, zip,
+        # local build). Source and test runs must never rewrite the user's real autostart entry.
         try:
-            if autostart.is_enabled():
+            if autostart.should_refresh() and autostart.is_enabled():
                 autostart.set_enabled(True)
         except OSError:
             log.exception("could not refresh autostart entry")
