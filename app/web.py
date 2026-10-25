@@ -50,9 +50,16 @@ ENTRY_PRELUDE = ("<script>(function(){var t=Date.now(),o=Element.prototype.scrol
 # Injected into every entry document: reports height to the parent, routes dictionary links.
 ENTRY_SCRIPT = r"""<script>(function(){
 var FID=%s;
-function send(){var d=document.documentElement,b=document.body;
- parent.postMessage({t:'h',id:FID,h:Math.max(d.scrollHeight,b?b.scrollHeight:0)},'*');}
-new ResizeObserver(send).observe(document.documentElement);
+// Measure the content wrapper, not documentElement.scrollHeight: the latter is never smaller than the
+// iframe itself, so growing the iframe to fit it made it grow forever.
+var last=-1;
+function send(){var w=document.getElementById('__ie_entry'); if(!w)return;
+ var cs=getComputedStyle(document.body);
+ var h=Math.ceil(w.getBoundingClientRect().height+parseFloat(cs.marginTop)+parseFloat(cs.marginBottom));
+ if(Math.abs(h-last)<2)return; last=h;
+ parent.postMessage({t:'h',id:FID,h:h},'*');}
+document.addEventListener('DOMContentLoaded',function(){
+ var w=document.getElementById('__ie_entry'); if(w)new ResizeObserver(send).observe(w); send();});
 window.addEventListener('load',send);
 document.addEventListener('click',function(e){
  var a=e.target.closest&&e.target.closest('a'); if(!a)return;
@@ -114,7 +121,7 @@ iframe {{ display:block; width:100%; border:0; height:60px; background:var(--bg)
 </style></head><body>{body}
 <script>
 window.addEventListener('message',function(e){{var m=e.data||{{}};
- if(m.t==='h'){{var f=document.getElementById(m.id); if(f)f.style.height=(m.h+4)+'px';}}
+ if(m.t==='h'){{var f=document.getElementById(m.id); if(f)f.style.height=m.h+'px';}}
  else if(m.t==='lookup'){{location.href='mdict://app/result?q='+encodeURIComponent(m.q);}}
  else if(m.t==='open'){{location.href=m.url;}}
  else if(m.t==='scroll'){{var f=document.getElementById(m.id); if(f)window.scrollTo(0,f.offsetTop+m.y-40);}}
@@ -299,7 +306,7 @@ class SchemeHandler(QWebEngineUrlSchemeHandler):
         dark = DARK_ENTRY_CSS if self.theme_name() == "dark" else ""
         body = "<hr style='border:0;border-top:1px dashed #ccc'>".join(frags)
         return (f"<meta charset='utf-8'>{ENTRY_PRELUDE}<style>body{{margin:8px 12px;}}</style>{dark}"
-                f"{body}{ENTRY_SCRIPT % json.dumps(fid)}")
+                f"<div id='__ie_entry' style='display:flow-root'>{body}</div>{ENTRY_SCRIPT % json.dumps(fid)}")
 
 
 class ResultPage(QWebEnginePage):
