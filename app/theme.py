@@ -7,14 +7,14 @@ THEMES = {
     "light": {
         "scheme": "light", "bg": "#ffffff", "panel": "#f4f5f7", "text": "#1f2328", "muted": "#6b7280",
         "border": "#d0d4da", "hover": "#e4e7eb", "accent": "#2563eb", "accent_bg": "#dbeafe",
-        "input_bg": "#ffffff", "selection": "#bfdbfe",
+        "input_bg": "#ffffff", "selection": "#bfdbfe", "disabled": "#c8ccd2",
         # Fusion bevel/border roles (checkbox frames, spin box arrows, scrollbars)
         "light": "#ffffff", "midlight": "#e5e7eb", "mid": "#b8bdc4", "dark": "#8b9098", "shadow": "#5f6670",
     },
     "dark": {
         "scheme": "dark", "bg": "#1e1f22", "panel": "#2b2d31", "text": "#e8e8e8", "muted": "#9aa0a6",
         "border": "#3f4248", "hover": "#383a40", "accent": "#60a5fa", "accent_bg": "#1e3a5f",
-        "input_bg": "#1e1f22", "selection": "#264f78",
+        "input_bg": "#1e1f22", "selection": "#264f78", "disabled": "#4a4d54",
         "light": "#55585f", "midlight": "#46494f", "mid": "#6b7078", "dark": "#151618", "shadow": "#000000",
     },
 }
@@ -58,6 +58,7 @@ QLineEdit:focus {{ border-color: {c['accent']}; }}
 QToolButton {{ border: none; padding: 4px 6px; border-radius: 4px; color: {c['muted']}; font-size: 14px; }}
 QToolButton:hover {{ background: {c['hover']}; }}
 QToolButton:checked {{ background: {c['accent_bg']}; color: {c['accent']}; }}
+QToolButton:disabled {{ color: {c['disabled']}; background: transparent; }}
 #grip {{ color: {c['muted']}; font-size: 16px; padding: 0 4px; }}
 QListView {{ background: {c['input_bg']}; color: {c['text']}; border: 1px solid {c['border']}; }}
 QListView::item:selected {{ background: {c['selection']}; color: {c['text']}; }}

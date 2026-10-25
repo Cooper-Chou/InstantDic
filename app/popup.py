@@ -76,6 +76,7 @@ class PopupWindow(QWidget):
         self.back = QToolButton(text="←", toolTip=tr("后退 (Alt+←)"))
         self.forward = QToolButton(text="→", toolTip=tr("前进 (Alt+→)"))
         self.input = QLineEdit(placeholderText=tr("输入单词或句子，回车查询"))
+        self.input.setClearButtonEnabled(True)  # × inside the box; clearing counts as an edit → history list
         self.input.returnPressed.connect(self._on_submit)
         self.input.textEdited.connect(self._on_text_edited)
         self.input.installEventFilter(self)
