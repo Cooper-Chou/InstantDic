@@ -58,6 +58,9 @@ class PopupWindow(QWidget):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(EDGE, 0, EDGE, EDGE)
         card = QFrame(objectName="card")
+        # The window itself switches to resize cursors over its edge margin; without a cursor of
+        # its own, everything inside would inherit that resize cursor once the mouse moves in.
+        card.setCursor(Qt.ArrowCursor)
         outer.addWidget(card)
         lay = QVBoxLayout(card)
         lay.setContentsMargins(0, 0, 0, 0)
