@@ -2,9 +2,7 @@
 
 [中文](README.md) | **English**
 
-*Foreword: I really like Eudic (欧路词典), and I rely on its quick-lookup popup in particular. It's pretty much the only feature I use; I never touch the vocabulary book or select-to-translate. But my computer has three monitors, and maybe the app has trouble with window sizing: after the screens go to sleep and wake up, the quick-lookup window sometimes breaks. The rendered content no longer matches the window frame, and mouse clicks land in the wrong places. Later I tried an open-source app called EasyDict. It's polished and convenient, but parts of the experience still weren't quite what I wanted. So out of frustration I vibe-coded InstantDic. InstantDic is just a quick-lookup window: no vocabulary book, no select-to-translate or screenshot translation. Simple on purpose.*
-
-*Sharing it here for anyone who finds it useful. If you hit a bug, please open an issue!*
+*Foreword: I really like Eudic (欧路词典), and I rely on its quick-lookup popup in particular. It's pretty much the only feature I use; I never touch the vocabulary book or select-to-translate. But maybe the app has trouble with window sizing: my computer has three monitors, and after the screens go to sleep and wake up, the quick-lookup window sometimes breaks. The rendered content no longer matches the window frame, and mouse clicks land in the wrong places. Later I tried an open-source app called EasyDict. It's polished and convenient, but parts of the experience still weren't quite what I wanted. So out of frustration I vibe-coded InstantDic. InstantDic is just a quick-lookup window: no vocabulary book, no select-to-translate or screenshot translation. Simple on purpose. Sharing it here for anyone who finds it useful. If you hit a bug, please open an issue.*
 
 
 
@@ -65,7 +63,7 @@ The code is MIT-licensed; see [LICENSE](LICENSE). Data sources and third-party c
 
 ## Tip: get the Eudic-for-Mac quick-lookup experience
 
-On a Mac, Eudic's quick-lookup window is one keystroke away, and it's very handy. To get the same feel on Windows, I use [AutoHotkey](https://github.com/AutoHotkey/AutoHotkey), an open-source key-remapping tool for Windows, to map **Win+Space** to InstantDic's hotkey **Ctrl+F12**. Pressing Win+Space then brings up the lookup window, just like on the Mac.
+On a Mac, Eudic's quick-lookup window opens with Option+Space. To keep the same key habit on Windows, I use [AutoHotkey](https://github.com/AutoHotkey/AutoHotkey), an open-source key-remapping tool for Windows, to map **Win+Space** to InstantDic's hotkey **Ctrl+F12**. Pressing Win+Space then brings up the lookup window, with the same key position as on the Mac.
 
 After installing AutoHotkey v2, create a `.ahk` file containing the line below and double-click it to run. To have it active at every login, put a shortcut to the file in your Startup folder (press `Win+R` and enter `shell:startup`).
 
