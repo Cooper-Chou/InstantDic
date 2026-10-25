@@ -59,10 +59,16 @@ jobs:
             dist/InstantDic-Setup-*.exe
             dist/InstantDic-Portable-*.zip
 
+      # Tags with a suffix (v0.1.0-beta.1) become pre-releases. Notes come from
+      # .github/release-notes/<tag>.md when present, otherwise GitHub generates them from commits.
       - name: Publish release
         if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v2
         with:
+          name: InstantDic ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          body_path: ${{ hashFiles(format('.github/release-notes/{0}.md', github.ref_name)) != '' && format('.github/release-notes/{0}.md', github.ref_name) || '' }}
+          generate_release_notes: ${{ hashFiles(format('.github/release-notes/{0}.md', github.ref_name)) == '' }}
           files: |
             dist/InstantDic-Setup-*.exe
             dist/InstantDic-Portable-*.zip
