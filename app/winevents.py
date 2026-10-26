@@ -7,7 +7,7 @@ import ctypes
 import logging
 from ctypes import wintypes
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import QWidget
 
 from .i18n import tr
@@ -181,3 +181,91 @@ def round_corners(hwnd):
     DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND = 33, 2
     pref = ctypes.c_int(DWMWCP_ROUND)
     dwmapi.DwmSetWindowAttribute(int(hwnd), DWMWA_WINDOW_CORNER_PREFERENCE, ctypes.byref(pref), 4)
+
+
+# ---------------------------------------------------------------- native frameless resizing
+# Technique as in zhiyiYo/PyQt-Frameless-Window (LGPLv3; reimplemented here, not copied):
+# keep WS_THICKFRAME so Windows does hit-testing, cursors and the sizing loop itself, answer
+# WM_NCCALCSIZE so that frame takes no space, and answer WM_NCHITTEST with the edge under the mouse.
+WM_NCCALCSIZE = 0x0083
+WM_NCHITTEST = 0x0084
+WM_ENTERSIZEMOVE = 0x0231
+WM_EXITSIZEMOVE = 0x0232
+HTLEFT, HTRIGHT, HTBOTTOM, HTBOTTOMLEFT, HTBOTTOMRIGHT = 10, 11, 15, 16, 17
+GWL_STYLE = -16
+WS_THICKFRAME = 0x00040000
+SWP_FRAMECHANGED = 0x0020
+SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_NOACTIVATE = 0x0002, 0x0001, 0x0004, 0x0010
+
+user32.GetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int]
+user32.GetWindowLongPtrW.restype = ctypes.c_ssize_t
+user32.SetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
+user32.SetWindowLongPtrW.restype = ctypes.c_ssize_t
+user32.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                                ctypes.c_int, wintypes.UINT]
+user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+
+
+def enable_native_resize(hwnd):
+    """Give a frameless window a (zero-width) resizable frame and make Windows recompute it."""
+    hwnd = int(hwnd)
+    style = user32.GetWindowLongPtrW(hwnd, GWL_STYLE)
+    if not style & WS_THICKFRAME:
+        user32.SetWindowLongPtrW(hwnd, GWL_STYLE, style | WS_THICKFRAME)
+    refresh_frame(hwnd)
+
+
+def refresh_frame(hwnd):
+    """Re-run WM_NCCALCSIZE, e.g. after moving to a monitor with a different DPI."""
+    user32.SetWindowPos(int(hwnd), None, 0, 0, 0, 0,
+                        SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE)
+
+
+def hit_test_edges(msg, border_px):
+    """WM_NCHITTEST answer for the left/right/bottom edges and bottom corners, or None (client)."""
+    r = wintypes.RECT()
+    user32.GetWindowRect(msg.hWnd, ctypes.byref(r))
+    # lParam holds signed 16-bit screen coordinates (physical pixels; the process is per-monitor DPI aware)
+    x = ctypes.c_short(msg.lParam & 0xFFFF).value
+    y = ctypes.c_short((msg.lParam >> 16) & 0xFFFF).value
+    left, right, bottom = x < r.left + border_px, x >= r.right - border_px, y >= r.bottom - border_px
+    corner = border_px * 3  # corners are easier to grab than the thin edges
+    if bottom or (y >= r.bottom - corner and (x < r.left + corner or x >= r.right - corner)):
+        if x < r.left + corner:
+            return HTBOTTOMLEFT
+        if x >= r.right - corner:
+            return HTBOTTOMRIGHT
+        return HTBOTTOM
+    if left:
+        return HTLEFT
+    if right:
+        return HTRIGHT
+    return None
+
+
+# ---------------------------------------------------------------- foreground changes
+EVENT_SYSTEM_FOREGROUND = 0x0003
+WINEVENT_OUTOFCONTEXT = 0x0000
+_WinEventProc = ctypes.WINFUNCTYPE(None, wintypes.HANDLE, wintypes.DWORD, wintypes.HWND, wintypes.LONG,
+                                   wintypes.LONG, wintypes.DWORD, wintypes.DWORD)
+user32.SetWinEventHook.argtypes = [wintypes.DWORD, wintypes.DWORD, wintypes.HMODULE, _WinEventProc,
+                                   wintypes.DWORD, wintypes.DWORD, wintypes.DWORD]
+user32.SetWinEventHook.restype = wintypes.HANDLE
+user32.UnhookWinEvent.argtypes = [wintypes.HANDLE]
+
+
+class ForegroundWatcher(QObject):
+    """Emits the new foreground window whenever any window in the system becomes foreground.
+    This is Windows' own view of focus, independent of Qt's activation bookkeeping."""
+    changed = Signal(int)
+
+    def __init__(self):
+        super().__init__()
+        self._proc = _WinEventProc(lambda *a: self.changed.emit(int(a[2] or 0)))  # keep a reference
+        self._hook = user32.SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, None,
+                                            self._proc, 0, 0, WINEVENT_OUTOFCONTEXT)
+
+    def close(self):
+        if self._hook:
+            user32.UnhookWinEvent(self._hook)
+            self._hook = None

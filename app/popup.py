@@ -2,6 +2,7 @@
 import json
 import logging
 import time
+from ctypes import wintypes
 
 from PySide6.QtCore import QEvent, QSize, Qt, QTimer, QUrl, QUrlQuery, Signal
 from PySide6.QtGui import QColor, QKeySequence, QShortcut
@@ -16,8 +17,7 @@ from .web import ResultPage, result_url
 
 log = logging.getLogger(__name__)
 
-EDGE = 5     # px of window margin (left / right / bottom) occupied by resize grips
-CORNER = 14  # bottom corners get bigger square grips so diagonal resizing is easy to hit
+EDGE = 5  # logical px of window margin (left / right / bottom) that Windows treats as the resize border
 SUGGEST_DEBOUNCE_MS = 120
 KIND_ROLE = Qt.UserRole + 1  # "history" / "suggest"
 
@@ -28,20 +28,6 @@ class _Grip(QLabel):
     def mousePressEvent(self, e):
         if e.button() == Qt.LeftButton:
             self.window().windowHandle().startSystemMove()
-
-
-class _EdgeGrip(QWidget):
-    """Invisible strip on a window edge. It owns its cursor and hands the drag to Windows'
-    native resize loop, so the window itself never tracks the mouse or changes its cursor."""
-
-    def __init__(self, parent, edges, cursor):
-        super().__init__(parent)
-        self.edges = edges
-        self.setCursor(cursor)
-
-    def mousePressEvent(self, e):
-        if e.button() == Qt.LeftButton:
-            self.window().windowHandle().startSystemResize(self.edges)
 
 
 class PopupWindow(QWidget):
@@ -61,12 +47,12 @@ class PopupWindow(QWidget):
         self._sec_state = None  # {"q": query, "items": {source id: html}}
         self.setWindowTitle("InstantDic")
         # Opaque window: translucent top-levels and Chromium don't mix well. The EDGE-wide
-        # margin around the card holds the resize grips; Win11 DWM adds the rounded border.
+        # margin around the card is the resize border (handled natively, see nativeEvent);
+        # Win11 DWM adds the rounded border.
         self.setObjectName("popup")
         self.setAttribute(Qt.WA_StyledBackground)
         self._expected = None       # (screen, QRect) from last placement
         self._fix_attempts = 0
-        self._placing = False       # True while place() sets the geometry (not a user resize)
         self._state = "hidden"      # "hidden" / "shown": the only source of truth for open/closed
         self._shown_at = 0.0
 
@@ -146,15 +132,9 @@ class PopupWindow(QWidget):
         QShortcut(QKeySequence("Alt+Right"), self, activated=lambda: self._navigate(1))
         QShortcut(QKeySequence("Ctrl+L"), self, activated=lambda: (self.input.setFocus(), self.input.selectAll()))
 
-        self._grips = [
-            _EdgeGrip(self, Qt.LeftEdge, Qt.SizeHorCursor),
-            _EdgeGrip(self, Qt.RightEdge, Qt.SizeHorCursor),
-            _EdgeGrip(self, Qt.BottomEdge, Qt.SizeVerCursor),
-            _EdgeGrip(self, Qt.LeftEdge | Qt.BottomEdge, Qt.SizeBDiagCursor),
-            _EdgeGrip(self, Qt.RightEdge | Qt.BottomEdge, Qt.SizeFDiagCursor),
-        ]
-        self._resize_save = QTimer(self, singleShot=True, interval=500)
-        self._resize_save.timeout.connect(self._emit_user_resize)
+        self.winId()  # create the native window now so the frame style can be set up
+        winevents.enable_native_resize(self.winId())
+        self.windowHandle().screenChanged.connect(lambda _s: winevents.refresh_frame(self.winId()))
 
     def apply_theme(self, name):
         self.page.setBackgroundColor(QColor(THEMES[name]["bg"]))
@@ -214,11 +194,7 @@ class PopupWindow(QWidget):
         # Move to the target screen first so Qt applies that screen's DPI before sizing.
         if wh.screen() is not screen:
             wh.setScreen(screen)
-        self._placing = True
-        try:
-            self.setGeometry(rect)
-        finally:
-            self._placing = False
+        self.setGeometry(rect)
         self._expected = (screen, rect)
         log.debug("placed on %s at %s", screen.name(), rect)
 
@@ -248,21 +224,18 @@ class PopupWindow(QWidget):
             self._fix_attempts = 0
             QTimer.singleShot(80, self._verify)
 
-    # ---------- edge resizing ----------
-    def resizeEvent(self, e):
-        super().resizeEvent(e)
-        w, h = self.width(), self.height()
-        left, right, bottom, bl, br = self._grips
-        left.setGeometry(0, 0, EDGE, h - CORNER)
-        right.setGeometry(w - EDGE, 0, EDGE, h - CORNER)
-        bottom.setGeometry(CORNER, h - EDGE, w - 2 * CORNER, EDGE)
-        bl.setGeometry(0, h - CORNER, CORNER, CORNER)
-        br.setGeometry(w - CORNER, h - CORNER, CORNER, CORNER)
-        for g in self._grips:
-            g.raise_()
-        # Any size change not caused by place() is the user dragging an edge; save once it settles.
-        if not self._placing and self._state == "shown":
-            self._resize_save.start()
+    # ---------- native frame: resizing ----------
+    def nativeEvent(self, eventType, message):
+        msg = wintypes.MSG.from_address(int(message))
+        if msg.message == winevents.WM_NCCALCSIZE and msg.wParam:
+            return True, 0  # the resizable frame takes no space: client area = whole window
+        if msg.message == winevents.WM_NCHITTEST:
+            hit = winevents.hit_test_edges(msg, round(EDGE * self.devicePixelRatioF()))
+            if hit is not None:
+                return True, hit  # Windows shows the cursor and runs the sizing loop itself
+        elif msg.message == winevents.WM_EXITSIZEMOVE:
+            QTimer.singleShot(0, self._emit_user_resize)  # end of a user drag (resize or move)
+        return False, 0
 
     def _emit_user_resize(self):
         size = self.size()
@@ -270,15 +243,14 @@ class PopupWindow(QWidget):
         if abs(size.width() - p.get("width", 0)) > 2 or abs(size.height() - p.get("height", 0)) > 2:
             self.userResized.emit(size)
 
-    # ---------- focus ----------
-    def changeEvent(self, e):
-        super().changeEvent(e)
-        if e.type() == QEvent.ActivationChange and not self.isActiveWindow():
-            QTimer.singleShot(0, self._on_deactivated)
-
-    def _on_deactivated(self):
-        """The user clicked somewhere outside the popup."""
-        if (self._state == "shown" and not self.isActiveWindow() and not self.pin.isChecked()
+    # ---------- closing when the user clicks elsewhere ----------
+    def on_foreground_changed(self, hwnd):
+        """Windows reports a new foreground window. While we're shown, any other window becoming
+        foreground means the user clicked outside (another app, the desktop, the taskbar, another
+        monitor). This works even if Windows never let the popup take the foreground."""
+        if hwnd == int(self.winId()):
+            return
+        if (self._state == "shown" and not self.pin.isChecked()
                 and self.cfg.popup.get("hide_on_blur", True)
                 and time.perf_counter() - self._shown_at > 0.3):  # ignore focus churn while showing
             self.hide_popup("clicked outside")

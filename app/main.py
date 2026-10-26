@@ -27,7 +27,7 @@ from .popup import PopupWindow
 from .screens import ScreenManager
 from .tray import Tray
 from .web import SCHEME, SchemeHandler, register_scheme
-from .winevents import SystemEvents
+from .winevents import ForegroundWatcher, SystemEvents
 
 log = logging.getLogger("instantdic")
 # One instance per data folder (a test run with INSTANTDIC_DATA_DIR doesn't collide with the real one).
@@ -70,6 +70,7 @@ class AppController:
 
         self.screens = ScreenManager(app)
         self.sys = SystemEvents()
+        self.foreground = ForegroundWatcher()
         self.popup = None
         self.console = None
         self._make_popup()
@@ -107,6 +108,7 @@ class AppController:
         self.popup = PopupWindow(self.cfg, self.screens, self.engine, self.ai, self.sections, self.history,
                                  self.theme_name, self.profile)
         self.popup.userResized.connect(self._save_size)
+        self.foreground.changed.connect(self.popup.on_foreground_changed)
         self.popup.broken.connect(self.reset_popup)
 
     def _save_size(self, size: QSize):
@@ -197,6 +199,7 @@ class AppController:
         was_visible = self.popup._state == "shown"
         text = self.popup.input.text()
         self.popup.hide_popup("reset")
+        self.foreground.changed.disconnect(self.popup.on_foreground_changed)
         self.popup.deleteLater()
         self._make_popup()
         self.popup.input.setText(text)
@@ -205,6 +208,7 @@ class AppController:
 
     def quit(self):
         self.sys.unregister_hotkey()
+        self.foreground.close()
         self.tray.hide()
         self.app.quit()
 

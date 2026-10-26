@@ -23,3 +23,6 @@ Dictionaries (.mdx/.mdd) are **not** distributed with this project. Users import
 | [opencc-python-reimplemented](https://github.com/yichen0831/opencc-python) (OpenCC dictionaries) | Apache-2.0 |
 | [NumPy](https://numpy.org/) (LemmInflect dependency) | BSD-3-Clause |
 | `app/_ripemd128.py`, vendored from [writemdict](https://github.com/zhansliu/writemdict) | MIT |
+
+The popup's native frameless resizing (`WS_THICKFRAME` + `WM_NCCALCSIZE` + `WM_NCHITTEST`) follows the technique used by
+[PyQt-Frameless-Window](https://github.com/zhiyiYo/PyQt-Frameless-Window) (LGPLv3). It is reimplemented in `app/winevents.py`; no code is copied.
