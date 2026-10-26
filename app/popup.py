@@ -142,7 +142,11 @@ class PopupWindow(QWidget):
 
     # ---------- show / hide ----------
     def toggle(self, t0=None):
-        if self.isVisible() and self.isActiveWindow():
+        # The popup is always on top, so "visible" means the user can see it: close it, even if
+        # another window has focus. (Checking isActiveWindow() here made the hotkey re-show an
+        # unfocused popup instead of closing it.)
+        if self.isVisible():
+            log.info("hotkey: hide")
             self.hide_popup()
         else:
             self.show_popup(t0)
@@ -242,6 +246,9 @@ class PopupWindow(QWidget):
         if e.button() == Qt.LeftButton and edges:
             self._user_resizing = True
             self.windowHandle().startSystemResize(edges)
+            # A click on the edge without dragging produces no resize event; make sure the flag
+            # still clears (resize events restart this timer while a drag is in progress).
+            self._resize_save.start()
 
     def resizeEvent(self, e):
         super().resizeEvent(e)
@@ -250,19 +257,21 @@ class PopupWindow(QWidget):
 
     def _emit_user_resize(self):
         self._user_resizing = False
-        self.userResized.emit(self.size())
+        if self._expected is None or self.size() != self._expected[1].size():
+            self.userResized.emit(self.size())
 
     # ---------- focus ----------
     def changeEvent(self, e):
         super().changeEvent(e)
         if (e.type() == QEvent.ActivationChange and not self.isActiveWindow() and self.isVisible()
-                and not self.pin.isChecked() and not self._user_resizing
+                and not self.pin.isChecked()
                 and self.cfg.popup.get("hide_on_blur", True)
                 and time.perf_counter() - self._shown_at > 0.3):
             QTimer.singleShot(0, self._hide_if_still_inactive)
 
     def _hide_if_still_inactive(self):
         if not self.isActiveWindow():
+            log.info("lost focus: hide")
             self.hide_popup()
 
     # ---------- lookup ----------
