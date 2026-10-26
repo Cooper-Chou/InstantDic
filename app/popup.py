@@ -3,7 +3,7 @@ import json
 import logging
 import time
 
-from PySide6.QtCore import QEvent, QPoint, QSize, Qt, QTimer, QUrl, QUrlQuery, Signal
+from PySide6.QtCore import QEvent, QSize, Qt, QTimer, QUrl, QUrlQuery, Signal
 from PySide6.QtGui import QColor, QKeySequence, QShortcut
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QStackedWidget,
@@ -16,7 +16,8 @@ from .web import ResultPage, result_url
 
 log = logging.getLogger(__name__)
 
-EDGE = 5  # px of window margin used as resize handle
+EDGE = 5     # px of window margin (left / right / bottom) occupied by resize grips
+CORNER = 14  # bottom corners get bigger square grips so diagonal resizing is easy to hit
 SUGGEST_DEBOUNCE_MS = 120
 KIND_ROLE = Qt.UserRole + 1  # "history" / "suggest"
 
@@ -27,6 +28,20 @@ class _Grip(QLabel):
     def mousePressEvent(self, e):
         if e.button() == Qt.LeftButton:
             self.window().windowHandle().startSystemMove()
+
+
+class _EdgeGrip(QWidget):
+    """Invisible strip on a window edge. It owns its cursor and hands the drag to Windows'
+    native resize loop, so the window itself never tracks the mouse or changes its cursor."""
+
+    def __init__(self, parent, edges, cursor):
+        super().__init__(parent)
+        self.edges = edges
+        self.setCursor(cursor)
+
+    def mousePressEvent(self, e):
+        if e.button() == Qt.LeftButton:
+            self.window().windowHandle().startSystemResize(self.edges)
 
 
 class PopupWindow(QWidget):
@@ -46,21 +61,18 @@ class PopupWindow(QWidget):
         self._sec_state = None  # {"q": query, "items": {source id: html}}
         self.setWindowTitle("InstantDic")
         # Opaque window: translucent top-levels and Chromium don't mix well. The EDGE-wide
-        # margin around the card is the resize handle; Win11 DWM adds the rounded border.
+        # margin around the card holds the resize grips; Win11 DWM adds the rounded border.
         self.setObjectName("popup")
         self.setAttribute(Qt.WA_StyledBackground)
-        self.setMouseTracking(True)
         self._expected = None       # (screen, QRect) from last placement
         self._fix_attempts = 0
-        self._user_resizing = False
+        self._placing = False       # True while place() sets the geometry (not a user resize)
+        self._state = "hidden"      # "hidden" / "shown": the only source of truth for open/closed
         self._shown_at = 0.0
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(EDGE, 0, EDGE, EDGE)
         card = QFrame(objectName="card")
-        # The window itself switches to resize cursors over its edge margin; without a cursor of
-        # its own, everything inside would inherit that resize cursor once the mouse moves in.
-        card.setCursor(Qt.ArrowCursor)
         outer.addWidget(card)
         lay = QVBoxLayout(card)
         lay.setContentsMargins(0, 0, 0, 0)
@@ -129,32 +141,39 @@ class PopupWindow(QWidget):
         # Pre-warm Chromium now so the first hotkey press shows instantly.
         self.view.load(QUrl("mdict://app/home"))
 
-        QShortcut(QKeySequence(Qt.Key_Escape), self, activated=self.hide_popup)
+        QShortcut(QKeySequence(Qt.Key_Escape), self, activated=lambda: self.hide_popup("Esc"))
         QShortcut(QKeySequence("Alt+Left"), self, activated=lambda: self._navigate(-1))
         QShortcut(QKeySequence("Alt+Right"), self, activated=lambda: self._navigate(1))
         QShortcut(QKeySequence("Ctrl+L"), self, activated=lambda: (self.input.setFocus(), self.input.selectAll()))
 
-        self._resize_save = QTimer(self, singleShot=True, interval=400)
+        self._grips = [
+            _EdgeGrip(self, Qt.LeftEdge, Qt.SizeHorCursor),
+            _EdgeGrip(self, Qt.RightEdge, Qt.SizeHorCursor),
+            _EdgeGrip(self, Qt.BottomEdge, Qt.SizeVerCursor),
+            _EdgeGrip(self, Qt.LeftEdge | Qt.BottomEdge, Qt.SizeBDiagCursor),
+            _EdgeGrip(self, Qt.RightEdge | Qt.BottomEdge, Qt.SizeFDiagCursor),
+        ]
+        self._resize_save = QTimer(self, singleShot=True, interval=500)
         self._resize_save.timeout.connect(self._emit_user_resize)
 
     def apply_theme(self, name):
         self.page.setBackgroundColor(QColor(THEMES[name]["bg"]))
 
     # ---------- show / hide ----------
+    # Two states, "hidden" and "shown". Every transition goes through show_popup() / hide_popup()
+    # and is logged. Rules: hotkey toggles; any click outside the window (it loses activation)
+    # hides it, unless pinned or "hide on blur" is turned off; Esc hides it.
     def toggle(self, t0=None):
-        # The popup is always on top, so "visible" means the user can see it: close it, even if
-        # another window has focus. (Checking isActiveWindow() here made the hotkey re-show an
-        # unfocused popup instead of closing it.)
-        if self.isVisible():
-            log.info("hotkey: hide")
-            self.hide_popup()
+        if self._state == "shown":
+            self.hide_popup("hotkey")
         else:
             self.show_popup(t0)
 
     def show_popup(self, t0=None):
         t0 = t0 or time.perf_counter()
-        if not self.isVisible():
+        if self._state == "hidden":
             self.place()
+        self._state = "shown"
         self.show()
         self.raise_()
         self.activateWindow()
@@ -172,14 +191,18 @@ class PopupWindow(QWidget):
         QTimer.singleShot(80, self._verify)
 
     def _retry_foreground(self):
-        if self.isVisible() and not winevents.is_foreground(self.winId()):
+        if self._state == "shown" and not winevents.is_foreground(self.winId()):
             ok = winevents.force_foreground(self.winId())
             log.info("foreground retry %s", "ok" if ok else "failed")
             self.activateWindow()
             self.input.setFocus()
 
-    def hide_popup(self):
+    def hide_popup(self, reason="request"):
+        if self._state == "hidden":
+            return
+        self._state = "hidden"
         self.hide()
+        log.info("popup hidden (%s)", reason)
 
     # ---------- geometry ----------
     def place(self):
@@ -191,13 +214,17 @@ class PopupWindow(QWidget):
         # Move to the target screen first so Qt applies that screen's DPI before sizing.
         if wh.screen() is not screen:
             wh.setScreen(screen)
-        self.setGeometry(rect)
+        self._placing = True
+        try:
+            self.setGeometry(rect)
+        finally:
+            self._placing = False
         self._expected = (screen, rect)
         log.debug("placed on %s at %s", screen.name(), rect)
 
     def _verify(self):
         """Catch Windows/Qt applying a stale DPI or dropping us on the wrong screen."""
-        if not self.isVisible() or self._expected is None:
+        if self._state != "shown" or self._expected is None:
             return
         screen, rect = self._expected
         g = self.geometry()
@@ -216,63 +243,45 @@ class PopupWindow(QWidget):
 
     def on_screens_settled(self):
         """Display layout changed (sleep/wake, monitor on/off). Re-anchor if visible."""
-        if self.isVisible():
+        if self._state == "shown":
             self.place()
             self._fix_attempts = 0
             QTimer.singleShot(80, self._verify)
 
     # ---------- edge resizing ----------
-    def _edges_at(self, pos: QPoint):
-        r = self.rect()
-        edges = Qt.Edges()
-        if pos.x() <= EDGE:
-            edges |= Qt.LeftEdge
-        if pos.x() >= r.width() - EDGE:
-            edges |= Qt.RightEdge
-        if pos.y() >= r.height() - EDGE:
-            edges |= Qt.BottomEdge
-        return edges
-
-    def mouseMoveEvent(self, e):
-        edges = self._edges_at(e.position().toPoint())
-        cursors = {
-            Qt.LeftEdge: Qt.SizeHorCursor, Qt.RightEdge: Qt.SizeHorCursor, Qt.BottomEdge: Qt.SizeVerCursor,
-            Qt.RightEdge | Qt.BottomEdge: Qt.SizeFDiagCursor, Qt.LeftEdge | Qt.BottomEdge: Qt.SizeBDiagCursor,
-        }
-        self.setCursor(cursors.get(edges, Qt.ArrowCursor))
-
-    def mousePressEvent(self, e):
-        edges = self._edges_at(e.position().toPoint())
-        if e.button() == Qt.LeftButton and edges:
-            self._user_resizing = True
-            self.windowHandle().startSystemResize(edges)
-            # A click on the edge without dragging produces no resize event; make sure the flag
-            # still clears (resize events restart this timer while a drag is in progress).
-            self._resize_save.start()
-
     def resizeEvent(self, e):
         super().resizeEvent(e)
-        if self._user_resizing:
+        w, h = self.width(), self.height()
+        left, right, bottom, bl, br = self._grips
+        left.setGeometry(0, 0, EDGE, h - CORNER)
+        right.setGeometry(w - EDGE, 0, EDGE, h - CORNER)
+        bottom.setGeometry(CORNER, h - EDGE, w - 2 * CORNER, EDGE)
+        bl.setGeometry(0, h - CORNER, CORNER, CORNER)
+        br.setGeometry(w - CORNER, h - CORNER, CORNER, CORNER)
+        for g in self._grips:
+            g.raise_()
+        # Any size change not caused by place() is the user dragging an edge; save once it settles.
+        if not self._placing and self._state == "shown":
             self._resize_save.start()
 
     def _emit_user_resize(self):
-        self._user_resizing = False
-        if self._expected is None or self.size() != self._expected[1].size():
-            self.userResized.emit(self.size())
+        size = self.size()
+        p = self.cfg.popup
+        if abs(size.width() - p.get("width", 0)) > 2 or abs(size.height() - p.get("height", 0)) > 2:
+            self.userResized.emit(size)
 
     # ---------- focus ----------
     def changeEvent(self, e):
         super().changeEvent(e)
-        if (e.type() == QEvent.ActivationChange and not self.isActiveWindow() and self.isVisible()
-                and not self.pin.isChecked()
-                and self.cfg.popup.get("hide_on_blur", True)
-                and time.perf_counter() - self._shown_at > 0.3):
-            QTimer.singleShot(0, self._hide_if_still_inactive)
+        if e.type() == QEvent.ActivationChange and not self.isActiveWindow():
+            QTimer.singleShot(0, self._on_deactivated)
 
-    def _hide_if_still_inactive(self):
-        if not self.isActiveWindow():
-            log.info("lost focus: hide")
-            self.hide_popup()
+    def _on_deactivated(self):
+        """The user clicked somewhere outside the popup."""
+        if (self._state == "shown" and not self.isActiveWindow() and not self.pin.isChecked()
+                and self.cfg.popup.get("hide_on_blur", True)
+                and time.perf_counter() - self._shown_at > 0.3):  # ignore focus churn while showing
+            self.hide_popup("clicked outside")
 
     # ---------- lookup ----------
     # ---------- suggestion / history list ----------

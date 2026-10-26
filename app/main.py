@@ -194,9 +194,9 @@ class AppController:
     def reset_popup(self):
         """Destroy and rebuild the window: clears any stale per-monitor DPI state Windows kept."""
         log.warning("recreating popup window")
-        was_visible = self.popup.isVisible()
+        was_visible = self.popup._state == "shown"
         text = self.popup.input.text()
-        self.popup.hide()
+        self.popup.hide_popup("reset")
         self.popup.deleteLater()
         self._make_popup()
         self.popup.input.setText(text)
