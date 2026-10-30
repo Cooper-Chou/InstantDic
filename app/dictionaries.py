@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import sqlite3
 from pathlib import Path
 
@@ -14,8 +15,9 @@ from .mdict import MDict
 log = logging.getLogger(__name__)
 
 INDEX_DIR = DATA_DIR / "index"
-INDEX_VERSION = 1
+INDEX_VERSION = 2  # 2: entries.link flags redirect (@@@LINK=) entries
 MAX_LINK_DEPTH = 5
+_HOMOGRAPH_ID = re.compile(r"_\d+$")  # packager ids such as see_1 / see_2
 
 
 def source_id_for(mdx_path):
@@ -55,7 +57,7 @@ def build_index(mdx_path, db_path, progress=lambda msg: None):
     con = sqlite3.connect(tmp)
     con.executescript("""
         CREATE TABLE meta(k TEXT PRIMARY KEY, v TEXT);
-        CREATE TABLE entries(key TEXT, norm TEXT, start INTEGER, end INTEGER);
+        CREATE TABLE entries(key TEXT, norm TEXT, start INTEGER, end INTEGER, link INTEGER);
         CREATE TABLE layout(vol INTEGER, i INTEGER, comp_off INTEGER, comp INTEGER, d_off INTEGER, d INTEGER);
         CREATE TABLE resources(norm TEXT, vol INTEGER, start INTEGER, end INTEGER);
     """)
@@ -66,12 +68,20 @@ def build_index(mdx_path, db_path, progress=lambda msg: None):
         m = MDict(path, is_mdd=is_mdd)
         try:
             keys = m.read_keys()
+            offsets = sorted({o for _, o in keys})
+            offsets.append(m.total_decomp)
+            link_offsets = set()
+            if not is_mdd:
+                # Flag redirect records once here, so suggestions can skip them with a plain query.
+                progress(tr("建立索引"))
+                marker = "@@@LINK=".encode(m.encoding)
+                for o, nxt in zip(offsets, offsets[1:]):
+                    if m.read_record(o, min(nxt, o + len(marker) + 8)).lstrip().startswith(marker):
+                        link_offsets.add(o)
         finally:
             m.close()
         if vol == 0:
             header = m.header
-        offsets = sorted({o for _, o in keys})
-        offsets.append(m.total_decomp)
 
         def end_of(o):
             return offsets[bisect.bisect_right(offsets, o)]
@@ -80,8 +90,8 @@ def build_index(mdx_path, db_path, progress=lambda msg: None):
             con.executemany("INSERT INTO resources VALUES (?,?,?,?)",
                             ((norm_res(k), vol, o, end_of(o)) for k, o in keys))
         else:
-            con.executemany("INSERT INTO entries VALUES (?,?,?,?)",
-                            ((k, norm_key(k), o, end_of(o)) for k, o in keys))
+            con.executemany("INSERT INTO entries VALUES (?,?,?,?,?)",
+                            ((k, norm_key(k), o, end_of(o), int(o in link_offsets)) for k, o in keys))
         con.executemany("INSERT INTO layout VALUES (?,?,?,?,?,?)",
                         ((vol, i, *b) for i, b in enumerate(m.record_layout)))
     progress(tr("建立索引"))
@@ -130,6 +140,10 @@ class MdxDictionary:
         files = json.loads(self.db.execute("SELECT v FROM meta WHERE k='files'").fetchone()[0])
         self._paths = [f[0] for f in files]
         self._vols = {}
+        self._links = {}  # key -> redirect target (None for real entries)
+        # Indexes built before INDEX_VERSION 2 have no link column; they keep working (unfiltered)
+        # until the background rebuild replaces them.
+        self._has_link = any(c[1] == "link" for c in self.db.execute("PRAGMA table_info(entries)"))
 
     def close(self):
         for m in self._vols.values():
@@ -168,15 +182,40 @@ class MdxDictionary:
             out.append(text)
         return out
 
+    def _link_target(self, key):
+        """Target of an @@@LINK redirect entry, or None for a real entry (cached)."""
+        if key in self._links:
+            return self._links[key]
+        row = self.db.execute("SELECT start, end FROM entries WHERE key=? LIMIT 1", (key,)).fetchone()
+        target = None
+        if row:
+            m = self._vol(0)
+            head = m.decode_text(m.read_record(row[0], min(row[1], row[0] + 512))).strip()
+            if head.startswith("@@@LINK="):
+                target = head[len("@@@LINK="):].splitlines()[0].strip() or None
+        if len(self._links) > 20000:
+            self._links.clear()
+        self._links[key] = target
+        return target
+
     def suggest(self, prefix, limit=30):
+        """Real headwords starting with prefix. Redirect entries (homograph ids like "see_1",
+        hyphen aliases like "see-in", inflections like "sees") are lookup aliases, not words to
+        offer; if the typed text itself is such an alias, its target is offered first instead."""
         p = norm_key(prefix)
         if not p:
             return []
         rows = self.db.execute(
             "SELECT DISTINCT key FROM entries WHERE norm >= ? AND norm < ? "
+            + ("AND link = 0 " if self._has_link else "") +
             "AND substr(key,1,1) NOT IN ('_','@') ORDER BY length(norm), norm LIMIT ?",
-            (p, p + "\U0010ffff", limit))
-        return [r[0] for r in rows]
+            (p, p + "\U0010ffff", limit * 2))
+        out = [k for (k,) in rows if not _HOMOGRAPH_ID.search(k)][:limit]
+        exact = self.db.execute("SELECT key FROM entries WHERE norm=? LIMIT 1", (p,)).fetchone()
+        target = self._link_target(exact[0]) if exact else None
+        if target and target not in out and not _HOMOGRAPH_ID.search(target):
+            out.insert(0, target)
+        return out[:limit]
 
     # ---------- resources ----------
     def resource(self, path):
